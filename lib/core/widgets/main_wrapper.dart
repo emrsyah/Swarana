@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hexcolor/hexcolor.dart';
 import 'custom_bottom_navigation.dart';
 import '../../features/board/presentation/pages/board_page.dart';
 import '../../features/history/presentation/pages/history_page.dart';

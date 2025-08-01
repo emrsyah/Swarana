@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hexcolor/hexcolor.dart';
 
 class TranskripPage extends StatelessWidget {
-  const TranskripPage({Key? key}) : super(key: key);
+  const TranskripPage({super.key});
 
   @override
   Widget build(BuildContext context) {
