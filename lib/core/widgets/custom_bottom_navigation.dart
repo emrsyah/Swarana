@@ -152,7 +152,7 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation>
                                 ? Icons.close 
                                 : IconsaxPlusBold.microphone_2,
                             color: Colors.white,
-                            size: 48,
+                            size: 35,
                           ),
                         ),
                       ),
@@ -308,7 +308,7 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation>
               label,
               style: TextStyle(
                 color: color, 
-                fontSize: 14,
+                fontSize: 12,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
