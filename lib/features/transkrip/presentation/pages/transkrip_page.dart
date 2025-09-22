@@ -3,6 +3,7 @@ import 'package:hexcolor/hexcolor.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:swarana/features/transkrip/presentation/pages/transkrip_result.dart';
 
 class TranskripPage extends StatefulWidget {
   const TranskripPage({super.key});
@@ -67,12 +68,16 @@ class _TranskripPageState extends State<TranskripPage> {
             return AlertDialog(
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
               title: const Center(
-                child: Text("Simpan Hasil Transkrip", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Text("Simpan Hasil Transkrip", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               ),
               content: TextField(
                 controller: _filenameController,
                 autofocus: true,
-                decoration: const InputDecoration(hintText: "Masukkan nama file transkrip...", border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  hintText: "Masukkan nama file transkrip...",
+                  border: OutlineInputBorder(),
+                  hintStyle: TextStyle(fontSize: 12),
+                ),
                 onChanged: (text) {
                   setStateDialog(() {});
                 },
@@ -105,7 +110,10 @@ class _TranskripPageState extends State<TranskripPage> {
                             final content = _recognizedWords;
                             print("Simpan file '$filename' dengan isi: '$content'");
                             _filenameController.clear();
-                            Navigator.of(context).pop();
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => TranskripResult(title: filename, content: content)),
+                            );
                             _isDialogShowing = false;
                           }
                           : null,
@@ -146,7 +154,6 @@ class _TranskripPageState extends State<TranskripPage> {
     });
   }
 
-  // Sisa kode (build, _buildMainTextField, _buildMicButton) tidak ada perubahan
   @override
   Widget build(BuildContext context) {
     return Scaffold(
