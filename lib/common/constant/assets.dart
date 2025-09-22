@@ -110,5 +110,9 @@ class ImageAssets {
 }
 
 class IconAssets {
-  static const String userVoice = "assets/icon/user_voice.svg";
+  static const String userVoice = "assets/icon/UserVoice.svg";
+  static const String history = "assets/icon/History.svg";
+  static const String messageText = "assets/icon/MessageText.svg";
+  static const String setting = "assets/icon/Setting.svg";
+  static const String transkrip = "assets/icon/Transkrip.svg";
 }

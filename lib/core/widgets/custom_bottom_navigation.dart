@@ -1,45 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_portal/flutter_portal.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
+import 'package:swarana/common/constant/assets.dart';
 import '../services/speech_service.dart';
-
 
 class CustomBottomNavigation extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTap;
 
-  const CustomBottomNavigation({
-    super.key,
-    required this.currentIndex,
-    required this.onTap,
-  });
+  const CustomBottomNavigation({super.key, required this.currentIndex, required this.onTap});
 
   @override
   State<CustomBottomNavigation> createState() => _CustomBottomNavigationState();
 }
 
-class _CustomBottomNavigationState extends State<CustomBottomNavigation> 
-    with TickerProviderStateMixin {
-  bool isFloatingMenuOpen = false;
+class _CustomBottomNavigationState extends State<CustomBottomNavigation> with TickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    
+    _animationController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
+
     _scaleAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _animationController,
-      curve: Curves.elasticOut,
-    ));
+    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.elasticOut));
   }
 
   @override
@@ -51,242 +40,95 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation>
 
   @override
   Widget build(BuildContext context) {
-    return PortalTarget(
-      visible: isFloatingMenuOpen,
-      portalFollower: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: () async {
-          if (!mounted) return;
-          await _animationController.reverse();
-          if (mounted) {
-            setState(() {
-              isFloatingMenuOpen = false;
-            });
-          }
-        },
-        child: Container(
-          color: Colors.transparent,
-          child: Center(
-            child: _buildFloatingMenu(),
-          ),
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.1), spreadRadius: 0, blurRadius: 10, offset: const Offset(0, -5)),
+        ],
       ),
-      anchor: const Aligned(
-        follower: Alignment.center,
-        target: Alignment.center,
-      ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.1),
-              spreadRadius: 0,
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: Container(
-            height: 70,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: _buildNavItem(
-                    index: 0,
-                    icon: IconsaxPlusLinear.message_text,
-                    outlineIcon: IconsaxPlusLinear.message_text,
-                    label: 'Bicara',
-                    onTap: () => widget.onTap(0),
-                  ),
-                ),
-                Transform.translate(
-                  offset: const Offset(0, -25),
-                  child: Container(
-                    width: 75,
-                    height: 75,
-                    decoration: BoxDecoration(
-                      color: isFloatingMenuOpen 
-                          ? HexColor('#3C37AF').withOpacity(0.6)
-                          : HexColor('#3C37AF'),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: HexColor('#3C37AF').withOpacity(0.4),
-                          spreadRadius: 2,
-                          blurRadius: 15,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () async {
-                          if (!mounted) return;
-                          
-                          if (isFloatingMenuOpen) {
-                            // Close the menu
-                            await _animationController.reverse();
-                            if (mounted) {
-                              setState(() {
-                                isFloatingMenuOpen = false;
-                              });
-                            }
-                          } else {
-                            // Open the menu
-                            setState(() {
-                              isFloatingMenuOpen = true;
-                            });
-                            _animationController.forward();
-                          }
-                        },
-                        customBorder: const CircleBorder(),
-                        child: Center(
-                          child: Icon(
-                            isFloatingMenuOpen 
-                                ? Icons.close 
-                                : IconsaxPlusBold.microphone_2,
-                            color: Colors.white,
-                            size: 35,
-                          ),
-                        ),
-                      ),
+      child: Stack(
+        clipBehavior: Clip.none,
+        alignment: Alignment.bottomCenter,
+        children: [
+          SafeArea(
+            child: Container(
+              height: 70,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  Expanded(
+                    child: _buildNavItem(
+                      index: 0,
+                      icon: IconAssets.messageText,
+                      label: 'Bicara',
+                      onTap: () => widget.onTap(0),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: _buildNavItem(
-                    index: 2,
-                    icon: Icons.history_rounded,
-                    outlineIcon: Icons.history_outlined,
-                    label: 'Riwayat',
-                    onTap: () => widget.onTap(2),
+                  Expanded(
+                    child: _buildNavItem(
+                      index: 1,
+                      icon: IconAssets.transkrip,
+                      label: 'Transkrip',
+                      onTap: () => widget.onTap(1),
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 60),
+                  Expanded(
+                    child: _buildNavItem(index: 2, icon: IconAssets.history, label: 'Riwayat', onTap: () => widget.onTap(2)),
+                  ),
+                  Expanded(
+                    child: _buildNavItem(
+                      index: 3,
+                      icon: IconAssets.setting,
+                      label: 'Pengaturan',
+                      onTap: () => widget.onTap(3),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFloatingMenu() {
-    return AnimatedBuilder(
-      animation: _animationController,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: const Offset(0, -100),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Left button (Dengar)
-              Transform.translate(
-                offset: Offset(-10 * _animationController.value, 0),
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: _buildFloatingButton(
-                    label: 'Dengar',
-                    icon: IconsaxPlusBold.microphone_2,
-                    onTap: () async {
-                      if (!mounted) return;
-                      await _animationController.reverse();
-                      if (mounted) {
-                        setState(() {
-                          isFloatingMenuOpen = false;
-                        });
-                        // Show listening modal
-                        _showListeningModal(context);
-                      }
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 20), // Space for the mic button in the middle
-              // Right button (Transkrip)
-              Transform.translate(
-                offset: Offset(10 * _animationController.value, 0),
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: _buildFloatingButton(
-                    label: 'Transkrip',
-                    icon: Icons.subtitles,
-                    onTap: () async {
-                      if (!mounted) return;
-                      await _animationController.reverse();
-                      if (mounted) {
-                        setState(() {
-                          isFloatingMenuOpen = false;
-                        });
-                        // Navigate to Transkrip page
-                        Navigator.pushNamed(context, '/transkrip');
-                      }
-                    },
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFloatingButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(30),
-      child: Container(
-        decoration: BoxDecoration(
-          color: HexColor('#3C37AF'),
-          borderRadius: BorderRadius.circular(30),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(30),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Row(
+          Positioned(
+            top: -25,
+            child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  icon,
-                  color: Colors.white,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                Container(
+                  width: 55,
+                  height: 55,
+                  decoration: BoxDecoration(
+                    color: HexColor('#3C37AF'),
+                    shape: BoxShape.circle,
+                    boxShadow: [BoxShadow(color: HexColor('#3C37AF').withOpacity(0.3), blurRadius: 10, spreadRadius: 2)],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () async {
+                        if (!mounted) return;
+                        if (mounted) {
+                          // Show listening modal
+                          _showListeningModal(context);
+                        }
+                      },
+                      customBorder: const CircleBorder(),
+                      child: Center(child: Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 40)),
+                    ),
                   ),
                 ),
+                const SizedBox(height: 10),
+                Text("Dengar", style: TextStyle(color: HexColor('#3C37AF'), fontSize: 10, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildNavItem({
-    required int index,
-    required IconData icon,
-    required IconData outlineIcon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _buildNavItem({required int index, required String icon, required String label, required VoidCallback onTap}) {
     final isActive = widget.currentIndex == index;
     final color = isActive ? HexColor('#3C37AF') : Colors.grey.shade400;
 
@@ -298,19 +140,11 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation>
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Icon(
-              isActive ? icon : outlineIcon,
-              color: color,
-              size: 26,
-            ),
+            SvgPicture.asset(icon, color: color),
             const SizedBox(height: 4),
             Text(
               label,
-              style: TextStyle(
-                color: color, 
-                fontSize: 12,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-              ),
+              style: TextStyle(color: color, fontSize: 10, fontWeight: isActive ? FontWeight.w600 : FontWeight.w400),
             ),
           ],
         ),
@@ -329,14 +163,13 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation>
 }
 
 class ListeningModal extends StatefulWidget {
-  const ListeningModal({Key? key}) : super(key: key);
+  const ListeningModal({super.key});
 
   @override
   State<ListeningModal> createState() => _ListeningModalState();
 }
 
-class _ListeningModalState extends State<ListeningModal>
-    with TickerProviderStateMixin {
+class _ListeningModalState extends State<ListeningModal> with TickerProviderStateMixin {
   bool isListening = false;
   bool showResult = false;
   bool _speechEnabled = false;
@@ -349,28 +182,19 @@ class _ListeningModalState extends State<ListeningModal>
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    );
+    _pulseController = AnimationController(duration: const Duration(milliseconds: 1000), vsync: this);
     _pulseAnimation = Tween<double>(
       begin: 0.8,
       end: 1.2,
-    ).animate(CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ));
-    
+    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
+
     _initializeSpeech();
   }
 
   Future<void> _initializeSpeech() async {
     try {
-      _speechEnabled = await _speechService.initialize(
-        onStatus: _onSpeechStatus,
-        onError: _onSpeechError,
-      );
-      
+      _speechEnabled = await _speechService.initialize(onStatus: _onSpeechStatus, onError: _onSpeechError);
+
       if (_speechEnabled) {
         setState(() {
           _statusMessage = 'Siap mendengarkan. Tekan mikrofon untuk memulai.';
@@ -421,14 +245,14 @@ class _ListeningModalState extends State<ListeningModal>
 
   Future<void> _startListening() async {
     if (!_speechEnabled) return;
-    
+
     try {
       setState(() {
         _recognizedText = '';
         showResult = false;
         _statusMessage = 'Memulai...';
       });
-      
+
       await _speechService.startListening(
         onResult: (recognizedWords) {
           setState(() {
@@ -464,10 +288,7 @@ class _ListeningModalState extends State<ListeningModal>
       height: MediaQuery.of(context).size.height * 0.7,
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
+        borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
       ),
       child: Column(
         children: [
@@ -477,21 +298,12 @@ class _ListeningModalState extends State<ListeningModal>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _getHeaderText(),
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                ),
+                Text(_getHeaderText(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
               ],
             ),
           ),
-          
+
           // Content
           Expanded(
             child: Padding(
@@ -502,15 +314,11 @@ class _ListeningModalState extends State<ListeningModal>
                   Text(
                     _statusMessage,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
                   ),
-                  
+
                   const SizedBox(height: 20),
-                  
+
                   // Recognized text content
                   if (_recognizedText.isNotEmpty) ...[
                     Container(
@@ -523,11 +331,7 @@ class _ListeningModalState extends State<ListeningModal>
                       ),
                       child: Text(
                         _recognizedText,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          height: 1.4,
-                        ),
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.4),
                       ),
                     ),
                   ] else if (!isListening && showResult) ...[
@@ -542,19 +346,15 @@ class _ListeningModalState extends State<ListeningModal>
                       child: const Text(
                         'Tidak ada teks yang berhasil dikenali. Silakan coba lagi.',
                         textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.orange,
-                          fontWeight: FontWeight.w500,
-                        ),
+                        style: TextStyle(fontSize: 14, color: Colors.orange, fontWeight: FontWeight.w500),
                       ),
                     ),
                   ],
-                  
+
                   const SizedBox(height: 40),
-                  
+
                   // Audio visualization or mic button
-                  if (isListening) 
+                  if (isListening)
                     AnimatedBuilder(
                       animation: _pulseAnimation,
                       builder: (context, child) {
@@ -563,15 +363,8 @@ class _ListeningModalState extends State<ListeningModal>
                           child: Container(
                             width: 80,
                             height: 80,
-                            decoration: BoxDecoration(
-                              color: HexColor('#3C37AF'),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.mic,
-                              color: Colors.white,
-                              size: 40,
-                            ),
+                            decoration: BoxDecoration(color: HexColor('#3C37AF'), shape: BoxShape.circle),
+                            child: const Icon(Icons.mic, color: Colors.white, size: 40),
                           ),
                         );
                       },
@@ -582,34 +375,24 @@ class _ListeningModalState extends State<ListeningModal>
                         Container(
                           width: 80,
                           height: 80,
-                          decoration: BoxDecoration(
-                            color: HexColor('#3C37AF'),
-                            shape: BoxShape.circle,
-                          ),
+                          decoration: BoxDecoration(color: HexColor('#3C37AF'), shape: BoxShape.circle),
                           child: IconButton(
                             onPressed: _speechEnabled ? _startListening : null,
-                            icon: const Icon(
-                              Icons.mic,
-                              color: Colors.white,
-                              size: 40,
-                            ),
+                            icon: const Icon(Icons.mic, color: Colors.white, size: 40),
                           ),
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          _speechEnabled 
+                          _speechEnabled
                               ? (showResult ? 'Tekan mic untuk ulang!' : 'Tekan mic untuk memulai!')
                               : 'Speech recognition tidak tersedia',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: _speechEnabled ? Colors.grey : Colors.red.shade400,
-                          ),
+                          style: TextStyle(fontSize: 14, color: _speechEnabled ? Colors.grey : Colors.red.shade400),
                         ),
                       ],
                     ),
-                  
+
                   const Spacer(),
-                  
+
                   // Stop listening button when actively listening
                   if (isListening)
                     Padding(
@@ -621,31 +404,22 @@ class _ListeningModalState extends State<ListeningModal>
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red.shade400,
                             padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           child: const Text(
                             'Berhenti Mendengarkan',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                         ),
                       ),
                     ),
-                  
-                  // Bottom content  
+
+                  // Bottom content
                   if (showResult && _recognizedText.isNotEmpty) ...[
                     const Text(
                       'Menemukan kesalahan? Bantu kami meningkatkan akurasi dengan mengirimkan umpan balik.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey,
-                      ),
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
                     ),
                     const SizedBox(height: 20),
                     SizedBox(
@@ -658,17 +432,11 @@ class _ListeningModalState extends State<ListeningModal>
                         style: ElevatedButton.styleFrom(
                           backgroundColor: HexColor('#3C37AF'),
                           padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         child: const Text(
                           'Kirim komplain',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
