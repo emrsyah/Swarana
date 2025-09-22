@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:swarana/features/transkrip/presentation/pages/transkrip_page.dart';
+import '../../features/setting/presentation/pages/setting_page.dart';
 import 'custom_bottom_navigation.dart';
 import '../../features/board/presentation/pages/board_page.dart';
 import '../../features/history/presentation/pages/history_page.dart';
@@ -15,8 +17,9 @@ class _MainWrapperState extends State<MainWrapper> {
 
   final List<Widget> _pages = [
     const BoardPage(),
-    const Center(child: Text('Recording Feature - Coming Soon')),
+    const TranskripPage(),
     const HistoryPage(),
+    const SettingPage(),
   ];
 
   void _onTabTapped(int index) {
@@ -30,10 +33,7 @@ class _MainWrapperState extends State<MainWrapper> {
     return Scaffold(
       backgroundColor: Colors.white, // Set your desired background color here
       body: _pages[_currentIndex],
-      bottomNavigationBar: CustomBottomNavigation(
-        currentIndex: _currentIndex,
-        onTap: _onTabTapped,
-      ),
+      bottomNavigationBar: CustomBottomNavigation(currentIndex: _currentIndex, onTap: _onTabTapped),
     );
   }
 }
