@@ -1,9 +1,11 @@
+// CustomBottomNavigation.dart
+
 import 'package:flutter/material.dart';
-import 'package:flutter_portal/flutter_portal.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:swarana/common/constant/assets.dart';
+
 import '../services/speech_service.dart';
 
 class CustomBottomNavigation extends StatefulWidget {
@@ -16,27 +18,8 @@ class CustomBottomNavigation extends StatefulWidget {
   State<CustomBottomNavigation> createState() => _CustomBottomNavigationState();
 }
 
-class _CustomBottomNavigationState extends State<CustomBottomNavigation> with TickerProviderStateMixin {
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(duration: const Duration(milliseconds: 300), vsync: this);
-
-    _scaleAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _animationController, curve: Curves.elasticOut));
-  }
-
-  @override
-  void dispose() {
-    _animationController.stop();
-    _animationController.dispose();
-    super.dispose();
-  }
+class _CustomBottomNavigationState extends State<CustomBottomNavigation> {
+  // SEMUA LOGIKA DAN STATE SPEECH RECOGNITION DIHAPUS DARI SINI
 
   @override
   Widget build(BuildContext context) {
@@ -106,13 +89,8 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation> with Ti
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () async {
-                        if (!mounted) return;
-                        if (mounted) {
-                          // Show listening modal
-                          _showListeningModal(context);
-                        }
-                      },
+                      // Hanya panggil fungsi untuk menampilkan modal
+                      onTap: () => _showListeningModal(context),
                       customBorder: const CircleBorder(),
                       child: Center(child: Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 40)),
                     ),
@@ -157,6 +135,7 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation> with Ti
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
+      // Konstruktor ListeningModal tidak lagi memerlukan parameter state
       builder: (context) => const ListeningModal(),
     );
   }
@@ -170,295 +149,167 @@ class ListeningModal extends StatefulWidget {
 }
 
 class _ListeningModalState extends State<ListeningModal> with TickerProviderStateMixin {
-  bool isListening = false;
-  bool showResult = false;
-  bool _speechEnabled = false;
-  String _recognizedText = '';
-  String _statusMessage = '';
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
   final SpeechService _speechService = SpeechService();
+  double _currentFontSize = 16.0;
 
   @override
   void initState() {
     super.initState();
-    _pulseController = AnimationController(duration: const Duration(milliseconds: 1000), vsync: this);
-    _pulseAnimation = Tween<double>(
-      begin: 0.8,
-      end: 1.2,
-    ).animate(CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut));
-
-    _initializeSpeech();
+    _startSession();
   }
 
-  Future<void> _initializeSpeech() async {
-    try {
-      _speechEnabled = await _speechService.initialize(onStatus: _onSpeechStatus, onError: _onSpeechError);
+  Future<void> _startSession() async {
+    await Future.delayed(const Duration(milliseconds: 200));
 
-      if (_speechEnabled) {
-        setState(() {
-          _statusMessage = 'Siap mendengarkan. Tekan mikrofon untuk memulai.';
-        });
-      } else {
-        setState(() {
-          _statusMessage = 'Speech recognition tidak tersedia di perangkat ini.';
-        });
+    bool isInitialized = await _speechService.initialize();
+    if (isInitialized) {
+      _startListening();
+    } else {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Izin mikrofon tidak diberikan atau tidak tersedia.')));
       }
-    } catch (e) {
-      setState(() {
-        _statusMessage = 'Error menginisialisasi speech recognition: $e';
-      });
     }
-  }
-
-  void _onSpeechStatus(String status) {
-    setState(() {
-      if (status == 'listening') {
-        isListening = true;
-        _statusMessage = 'Mendengarkan...';
-        _pulseController.repeat(reverse: true);
-      } else if (status == 'notListening') {
-        isListening = false;
-        _pulseController.stop();
-        if (_recognizedText.isNotEmpty) {
-          showResult = true;
-          _statusMessage = 'Selesai mendengarkan';
-        } else {
-          _statusMessage = 'Tidak ada suara yang terdeteksi';
-        }
-      } else if (status == 'done') {
-        isListening = false;
-        showResult = true;
-        _pulseController.stop();
-        _statusMessage = 'Selesai';
-      }
-    });
-  }
-
-  void _onSpeechError(dynamic error) {
-    setState(() {
-      isListening = false;
-      _pulseController.stop();
-      _statusMessage = 'Error: ${error.toString()}';
-    });
   }
 
   Future<void> _startListening() async {
-    if (!_speechEnabled) return;
-
-    try {
-      setState(() {
-        _recognizedText = '';
-        showResult = false;
-        _statusMessage = 'Memulai...';
-      });
-
-      await _speechService.startListening(
-        onResult: (recognizedWords) {
-          setState(() {
-            _recognizedText = recognizedWords;
-          });
-        },
-        localeId: 'id_ID',
-        timeout: const Duration(seconds: 30),
-        pauseFor: const Duration(seconds: 3),
-        partialResults: true,
-      );
-    } catch (e) {
-      setState(() {
-        _statusMessage = 'Error memulai listening: $e';
-      });
-    }
-  }
-
-  Future<void> _stopListening() async {
-    await _speechService.stopListening();
+    await _speechService.startListening(pauseFor: const Duration(seconds: 4));
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
-    _speechService.dispose();
+    _speechService.stopListening();
     super.dispose();
+  }
+
+  void _stopAndClose() {
+    _speechService.stopListening();
+    Navigator.pop(context);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.7,
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.fastOutSlowIn,
+      child: Container(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+        ),
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _speechService.isListeningNotifier,
+          builder: (context, isListening, child) {
+            return ValueListenableBuilder<String>(
+              valueListenable: _speechService.recognizedTextNotifier,
+              builder: (context, recognizedText, child) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 10, 10),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isListening ? 'Mendengarkan...' : 'Hasil Tangkapan',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                          ),
+                          IconButton(onPressed: _stopAndClose, icon: const Icon(Icons.close)),
+                        ],
+                      ),
+                    ),
+                    _buildListeningView(isListening, recognizedText),
+                  ],
+                );
+              },
+            );
+          },
+        ),
       ),
+    );
+  }
+
+  Widget _buildListeningView(bool isListening, String recognizedText) {
+    final bool showResult = !isListening && recognizedText.isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
       child: Column(
         children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          if (recognizedText.isNotEmpty)
+            Text(
+              recognizedText,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: _currentFontSize, fontWeight: FontWeight.w500, height: 1.5),
+            )
+          else if (isListening)
+            Text("")
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Text("Tidak ada suara yang terdeteksi.", style: TextStyle(color: Colors.grey[600])),
+            ),
+          const SizedBox(height: 30),
+          if (isListening)
+            Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(color: HexColor('#D32F2F'), shape: BoxShape.circle),
+              child: const Icon(Icons.mic, color: Colors.white, size: 40),
+            )
+          else
+            Column(
               children: [
-                Text(_getHeaderText(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.close)),
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(color: HexColor('#3C37AF'), shape: BoxShape.circle),
+                  child: IconButton(onPressed: _startListening, icon: const Icon(Icons.mic, color: Colors.white, size: 40)),
+                ),
+                const SizedBox(height: 15),
+                const Text('Tekan mic untuk lanjutkan obrolan', style: TextStyle(fontSize: 14, color: Colors.grey)),
               ],
             ),
-          ),
-
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  // Status message
-                  Text(
-                    _statusMessage,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontWeight: FontWeight.w500),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  // Recognized text content
-                  if (_recognizedText.isNotEmpty) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey.shade200),
-                      ),
-                      child: Text(
-                        _recognizedText,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500, height: 1.4),
-                      ),
-                    ),
-                  ] else if (!isListening && showResult) ...[
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.orange.shade200),
-                      ),
-                      child: const Text(
-                        'Tidak ada teks yang berhasil dikenali. Silakan coba lagi.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 14, color: Colors.orange, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-
-                  const SizedBox(height: 40),
-
-                  // Audio visualization or mic button
-                  if (isListening)
-                    AnimatedBuilder(
-                      animation: _pulseAnimation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: _pulseAnimation.value,
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(color: HexColor('#3C37AF'), shape: BoxShape.circle),
-                            child: const Icon(Icons.mic, color: Colors.white, size: 40),
-                          ),
-                        );
-                      },
-                    )
-                  else
-                    Column(
-                      children: [
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(color: HexColor('#3C37AF'), shape: BoxShape.circle),
-                          child: IconButton(
-                            onPressed: _speechEnabled ? _startListening : null,
-                            icon: const Icon(Icons.mic, color: Colors.white, size: 40),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          _speechEnabled
-                              ? (showResult ? 'Tekan mic untuk ulang!' : 'Tekan mic untuk memulai!')
-                              : 'Speech recognition tidak tersedia',
-                          style: TextStyle(fontSize: 14, color: _speechEnabled ? Colors.grey : Colors.red.shade400),
-                        ),
-                      ],
-                    ),
-
-                  const Spacer(),
-
-                  // Stop listening button when actively listening
-                  if (isListening)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 20),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _stopListening,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade400,
-                            padding: const EdgeInsets.symmetric(vertical: 15),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                          child: const Text(
-                            'Berhenti Mendengarkan',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ),
-
-                  // Bottom content
-                  if (showResult && _recognizedText.isNotEmpty) ...[
-                    const Text(
-                      'Menemukan kesalahan? Bantu kami meningkatkan akurasi dengan mengirimkan umpan balik.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 14, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          // Handle complaint submission
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: HexColor('#3C37AF'),
-                          padding: const EdgeInsets.symmetric(vertical: 15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                        child: const Text(
-                          'Kirim komplain',
-                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+          if (showResult) ...[
+            const SizedBox(height: 30),
+            _buildFontSizeControl(),
+            const SizedBox(height: 20),
+            const Text(
+              'Menemukan kesalahan? Bantu kami meningkatkan akurasi dengan mengirimkan umpan balik.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey),
             ),
-          ),
+          ],
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  String _getHeaderText() {
-    if (isListening) {
-      return 'Mendengarkan...';
-    } else if (showResult) {
-      return 'Hasil Tangkapan';
-    } else if (_speechEnabled) {
-      return 'Speech Recognition';
-    } else {
-      return 'Speech Tidak Tersedia';
-    }
+  Widget _buildFontSizeControl() {
+    return Row(
+      children: [
+        const Text("Aa", style: TextStyle(fontSize: 12)),
+        Expanded(
+          child: Slider(
+            value: _currentFontSize,
+            min: 12.0,
+            max: 28.0,
+            activeColor: HexColor('#3C37AF'),
+            onChanged: (newValue) {
+              setState(() {
+                _currentFontSize = newValue;
+              });
+            },
+          ),
+        ),
+        const Text("Aa", style: TextStyle(fontSize: 20)),
+      ],
+    );
   }
 }
