@@ -1,12 +1,13 @@
 // CustomBottomNavigation.dart
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
-import 'package:swarana/common/constant/assets.dart';
+import 'package:swarana/common/constant/assets.dart'; // Pastikan path ini benar
 
-import '../services/speech_service.dart';
+import '../services/speech_service.dart'; // Pastikan path ini benar
 
 class CustomBottomNavigation extends StatefulWidget {
   final int currentIndex;
@@ -19,8 +20,7 @@ class CustomBottomNavigation extends StatefulWidget {
 }
 
 class _CustomBottomNavigationState extends State<CustomBottomNavigation> {
-  // SEMUA LOGIKA DAN STATE SPEECH RECOGNITION DIHAPUS DARI SINI
-
+  // ... (Tidak ada perubahan di sini)
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -89,7 +89,6 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      // Hanya panggil fungsi untuk menampilkan modal
                       onTap: () => _showListeningModal(context),
                       customBorder: const CircleBorder(),
                       child: Center(child: Icon(IconsaxPlusBold.microphone_2, color: Colors.white, size: 40)),
@@ -135,11 +134,14 @@ class _CustomBottomNavigationState extends State<CustomBottomNavigation> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      // Konstruktor ListeningModal tidak lagi memerlukan parameter state
       builder: (context) => const ListeningModal(),
     );
   }
 }
+
+// =========================================================================
+// MODIFIKASI UTAMA ADA DI DALAM LISTENINGMODAL
+// =========================================================================
 
 class ListeningModal extends StatefulWidget {
   const ListeningModal({super.key});
@@ -150,17 +152,28 @@ class ListeningModal extends StatefulWidget {
 
 class _ListeningModalState extends State<ListeningModal> with TickerProviderStateMixin {
   final SpeechService _speechService = SpeechService();
-  double _currentFontSize = 16.0;
+  double _currentFontSize = 20.0;
+  final DraggableScrollableController _sheetController = DraggableScrollableController();
+  bool _isFullScreen = false;
 
   @override
   void initState() {
     super.initState();
+    _sheetController.addListener(_updateFullScreenState);
     _startSession();
+  }
+
+  void _updateFullScreenState() {
+    final isCurrentlyFull = _sheetController.size > 0.9;
+    if (isCurrentlyFull != _isFullScreen) {
+      setState(() {
+        _isFullScreen = isCurrentlyFull;
+      });
+    }
   }
 
   Future<void> _startSession() async {
     await Future.delayed(const Duration(milliseconds: 200));
-
     bool isInitialized = await _speechService.initialize();
     if (isInitialized) {
       _startListening();
@@ -181,6 +194,8 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
   @override
   void dispose() {
     _speechService.stopListening();
+    _sheetController.removeListener(_updateFullScreenState);
+    _sheetController.dispose();
     super.dispose();
   }
 
@@ -191,125 +206,267 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.fastOutSlowIn,
-      child: Container(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 20),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
-        ),
-        child: ValueListenableBuilder<bool>(
-          valueListenable: _speechService.isListeningNotifier,
-          builder: (context, isListening, child) {
-            return ValueListenableBuilder<String>(
-              valueListenable: _speechService.recognizedTextNotifier,
-              builder: (context, recognizedText, child) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Header
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 10, 10),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            isListening ? 'Mendengarkan...' : 'Hasil Tangkapan',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-                          ),
-                          IconButton(onPressed: _stopAndClose, icon: const Icon(Icons.close)),
-                        ],
+    // 1. Bungkus dengan ValueListenableBuilder untuk mendengarkan status isListening
+    return ValueListenableBuilder<bool>(
+      valueListenable: _speechService.isListeningNotifier,
+      builder: (context, isListening, _) {
+        // 2. Bungkus lagi untuk mendengarkan hasil teks
+        return ValueListenableBuilder<String>(
+          valueListenable: _speechService.recognizedTextNotifier,
+          builder: (context, recognizedText, _) {
+            // 3. Tentukan ukuran sheet berdasarkan kondisi
+            final bool hasResults = recognizedText.isNotEmpty;
+            double initialSize;
+            double minSize;
+
+            // Kondisi 1: Sedang mendengarkan ATAU belum ada hasil
+            if (isListening || !hasResults) {
+              initialSize = 0.25;
+              minSize = 0.25;
+            }
+            // Kondisi 2: Selesai mendengarkan DAN sudah ada hasil
+            else {
+              initialSize = 0.5;
+              minSize = 0.4;
+            }
+
+            // 4. Gunakan ukuran dinamis pada DraggableScrollableSheet
+            return DraggableScrollableSheet(
+              controller: _sheetController,
+              initialChildSize: initialSize, // <- Diubah
+              minChildSize: minSize, // <- Diubah
+              maxChildSize: 0.95,
+              expand: false,
+              builder: (_, scrollController) {
+                return Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+                  ),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: ListView(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          children: [
+                            const SizedBox(height: 12),
+                            Center(
+                              child: Container(
+                                width: 40,
+                                height: 4,
+                                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isListening ? 'Mendengarkan...' : 'Hasil tangkapan',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: HexColor("#717884")),
+                                ),
+                                IconButton(onPressed: _stopAndClose, icon: const Icon(Icons.close)),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            // Logika untuk menampilkan view tidak perlu diubah
+                            if (isListening)
+                              _buildListeningView()
+                            else if (hasResults)
+                              _buildResultView(recognizedText)
+                            else
+                              _buildEmptyView(),
+                          ],
+                        ),
                       ),
-                    ),
-                    _buildListeningView(isListening, recognizedText),
-                  ],
+                      // Bagian bawah ini juga tidak perlu diubah
+                      if (!isListening) _buildFixedBottomSection(),
+                    ],
+                  ),
                 );
               },
             );
           },
+        );
+      },
+    );
+  }
+
+  // MODIFIKASI: Widget ini sekarang hanya berisi bagian yang di-scroll
+  Widget _buildResultView(String recognizedText) {
+    return Column(
+      children: [
+        Text(
+          recognizedText,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: _currentFontSize, fontWeight: FontWeight.w500, height: 1.5),
         ),
+        const SizedBox(height: 20),
+        _buildFontSizeControl(),
+        const SizedBox(height: 24),
+        Visibility(visible: _isFullScreen, child: _buildSuggestionGrid()),
+        const SizedBox(height: 20), // Padding di bawah sebelum konten fixed
+      ],
+    );
+  }
+
+  // MODIFIKASI: Widget ini sekarang hanya berisi bagian yang di-scroll
+  Widget _buildEmptyView() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Text(
+        "Tidak ada suara yang terdeteksi.",
+        textAlign: TextAlign.center,
+        style: TextStyle(color: Colors.grey[600], fontSize: 16),
       ),
     );
   }
 
-  Widget _buildListeningView(bool isListening, String recognizedText) {
-    final bool showResult = !isListening && recognizedText.isNotEmpty;
+  // BARU: Widget untuk bagian bawah yang posisinya tetap
+  Widget _buildFixedBottomSection() {
+    // Cek apakah ada hasil untuk menampilkan teks feedback
+    final bool hasResults = _speechService.recognizedTextNotifier.value.isNotEmpty;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 30), // Padding untuk bagian bawah
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (recognizedText.isNotEmpty)
-            Text(
-              recognizedText,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: _currentFontSize, fontWeight: FontWeight.w500, height: 1.5),
-            )
-          else if (isListening)
-            Text("")
-          else
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Text("Tidak ada suara yang terdeteksi.", style: TextStyle(color: Colors.grey[600])),
-            ),
-          const SizedBox(height: 30),
-          if (isListening)
-            Container(
-              width: 70,
-              height: 70,
-              decoration: BoxDecoration(color: HexColor('#D32F2F'), shape: BoxShape.circle),
-              child: const Icon(Icons.mic, color: Colors.white, size: 40),
-            )
-          else
-            Column(
-              children: [
-                Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(color: HexColor('#3C37AF'), shape: BoxShape.circle),
-                  child: IconButton(onPressed: _startListening, icon: const Icon(Icons.mic, color: Colors.white, size: 40)),
-                ),
-                const SizedBox(height: 15),
-                const Text('Tekan mic untuk lanjutkan obrolan', style: TextStyle(fontSize: 14, color: Colors.grey)),
-              ],
-            ),
-          if (showResult) ...[
+          Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(color: HexColor('#3C37AF'), shape: BoxShape.circle),
+            child: IconButton(onPressed: _startListening, icon: const Icon(Icons.mic, color: Colors.white, size: 50)),
+          ),
+          const SizedBox(height: 15),
+          Text('Tekan mic untuk lanjutkan obrolan', style: TextStyle(fontSize: 12, color: HexColor('#929292'))),
+          // Tampilkan teks feedback hanya jika ada hasil
+          if (hasResults) ...[
             const SizedBox(height: 30),
-            _buildFontSizeControl(),
-            const SizedBox(height: 20),
-            const Text(
-              'Menemukan kesalahan? Bantu kami meningkatkan akurasi dengan mengirimkan umpan balik.',
+            RichText(
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+              text: TextSpan(
+                style: TextStyle(fontSize: 16.0),
+                children: <TextSpan>[
+                  const TextSpan(
+                    text: 'Menemukan kesalahan? Bantu kami meningkatkan akurasi dengan mengirimkan ',
+                    style: TextStyle(color: Colors.black, fontSize: 12),
+                  ),
+                  TextSpan(
+                    text: 'umpan balik',
+                    style: TextStyle(color: HexColor("#3C37AF"), decoration: TextDecoration.underline, fontSize: 12),
+                    recognizer:
+                        TapGestureRecognizer()
+                          ..onTap = () {
+                            print('Tautan "umpan balik" diklik!');
+                          },
+                  ),
+                ],
+              ),
             ),
           ],
-          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _buildFontSizeControl() {
-    return Row(
-      children: [
-        const Text("Aa", style: TextStyle(fontSize: 12)),
-        Expanded(
-          child: Slider(
-            value: _currentFontSize,
-            min: 12.0,
-            max: 28.0,
-            activeColor: HexColor('#3C37AF'),
-            onChanged: (newValue) {
-              setState(() {
-                _currentFontSize = newValue;
-              });
-            },
-          ),
+  // Tidak ada perubahan pada method di bawah ini
+  Widget _buildListeningView() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40),
+      child: Container(
+        width: 70,
+        height: 70,
+        decoration: BoxDecoration(color: HexColor('#D32F2F'), shape: BoxShape.circle),
+        child: const Icon(Icons.mic, color: Colors.white, size: 40),
+      ),
+    );
+  }
+
+  Widget _buildSuggestionGrid() {
+    final suggestions = [
+      'Saya baik-baik saja',
+      'Saya merasa pusing',
+      'Saya merasa mual',
+      'Saya membutuhkan bantuan',
+      'Saya butuh istirahat',
+      'Saya merasa lelah',
+    ];
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(color: HexColor('#3C37AF').withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.all(16),
+      child: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          childAspectRatio: 1.5,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
         ),
-        const Text("Aa", style: TextStyle(fontSize: 20)),
-      ],
+        shrinkWrap: true,
+        itemCount: suggestions.length,
+        itemBuilder: (context, index) {
+          final suggestion = suggestions[index];
+          // final isSelected = _selectedText == sentence.text;
+
+          return _SuggestionCard(suggestion: suggestion);
+        },
+      ),
+    );
+  }
+
+  Widget _buildFontSizeControl() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 25),
+      child: Row(
+        children: [
+          const Text("Aa", style: TextStyle(fontSize: 12)),
+          Expanded(
+            child: Slider(
+              value: _currentFontSize,
+              min: 12.0,
+              max: 28.0,
+              activeColor: HexColor('#3C37AF'),
+              onChanged: (newValue) {
+                setState(() {
+                  _currentFontSize = newValue;
+                });
+              },
+            ),
+          ),
+          const Text("Aa", style: TextStyle(fontSize: 20)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SuggestionCard extends StatelessWidget {
+  final String suggestion;
+
+  const _SuggestionCard({required this.suggestion});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 4, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          suggestion,
+          textAlign: TextAlign.center,
+          maxLines: 4,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87),
+        ),
+      ),
     );
   }
 }
