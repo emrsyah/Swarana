@@ -8,7 +8,7 @@ plugins {
 android {
     namespace = "com.example.swarana"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion = flutter.ndkVersion // Commented out to use default NDK
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11

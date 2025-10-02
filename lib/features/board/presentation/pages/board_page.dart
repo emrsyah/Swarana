@@ -1,7 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:hexcolor/hexcolor.dart';
-import 'package:iconsax_plus/iconsax_plus.dart';
 import '../../../../common/constant/assets.dart';
 import '../widgets/word_board.dart';
 import '../../domain/entities/word_item.dart';
@@ -15,6 +17,7 @@ class BoardPage extends StatefulWidget {
 
 class _BoardPageState extends State<BoardPage> {
   final TextEditingController _textController = TextEditingController();
+  late final FlutterTts _flutterTts;
   int _currentTemplateIndex = 0;
 
   // Template data - organized for easy extension
@@ -241,6 +244,13 @@ class _BoardPageState extends State<BoardPage> {
 
   TemplateData get _currentTemplate => _templates[_currentTemplateIndex];
 
+  @override
+  void initState() {
+    super.initState();
+    _flutterTts = FlutterTts();
+    unawaited(_configureTts());
+  }
+
   void _addTextToInput(String text) {
     final currentText = _textController.text;
     if (currentText.isEmpty) {
@@ -250,21 +260,22 @@ class _BoardPageState extends State<BoardPage> {
     }
   }
 
-  void _navigateToNextTemplate() {
-    setState(() {
-      _currentTemplateIndex = (_currentTemplateIndex + 1) % _templates.length;
-    });
+  Future<void> _configureTts() async {
+    await _flutterTts.setLanguage('id-ID');
+    await _flutterTts.setSpeechRate(0.5);
   }
 
-  void _navigateToPreviousTemplate() {
-    setState(() {
-      _currentTemplateIndex = (_currentTemplateIndex - 1 + _templates.length) % _templates.length;
-    });
+  Future<void> _speakCurrentInput() async {
+    final text = _textController.text.trim();
+    if (text.isEmpty) return;
+    await _flutterTts.stop();
+    await _flutterTts.speak(text);
   }
 
   @override
   void dispose() {
     _textController.dispose();
+    unawaited(_flutterTts.stop());
     super.dispose();
   }
 
@@ -302,53 +313,23 @@ class _BoardPageState extends State<BoardPage> {
                     ),
                     suffixIcon: IconButton(
                       icon: SvgPicture.asset(IconAssets.userVoice, color: HexColor('#3C37AF'), height: 30),
-                      onPressed: () {
-                        print('mic button pressed');
-                        // Add your mic button logic here
+                      onPressed: () async {
+                        await _speakCurrentInput();
                       },
                     ),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: HexColor('#3C37AF').withOpacity(0.05),
-                      border: Border.all(color: HexColor('#3C37AF'), width: 1),
-                    ),
-                    child: IconButton(
-                      onPressed: _navigateToPreviousTemplate,
-                      icon: Icon(Icons.chevron_left, color: HexColor('#3C37AF'), size: 28),
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(color: HexColor('#3C37AF'), borderRadius: BorderRadius.circular(12)),
-                      child: Text(
-                        _currentTemplate.type.displayName,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: HexColor('#3C37AF').withOpacity(0.05),
-                      border: Border.all(color: HexColor('#3C37AF'), width: 1),
-                    ),
-                    child: IconButton(
-                      onPressed: _navigateToNextTemplate,
-                      icon: Icon(Icons.chevron_right, color: HexColor('#3C37AF'), size: 28),
-                    ),
-                  ),
-                ],
+              _TemplateSelector(
+                templates: _templates,
+                currentIndex: _currentTemplateIndex,
+                onSelected: (index) {
+                  if (index == _currentTemplateIndex) return;
+                  setState(() {
+                    _currentTemplateIndex = index;
+                  });
+                },
               ),
               const SizedBox(height: 20),
               Expanded(
@@ -365,6 +346,52 @@ class _BoardPageState extends State<BoardPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _TemplateSelector extends StatelessWidget {
+  const _TemplateSelector({required this.templates, required this.currentIndex, required this.onSelected});
+
+  final List<TemplateData> templates;
+  final int currentIndex;
+  final ValueChanged<int> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final HexColor primary = HexColor('#3C37AF');
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: templates.asMap().entries.map((entry) {
+          final index = entry.key;
+          final template = entry.value;
+          final bool isSelected = index == currentIndex;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => onSelected(index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: isSelected ? primary : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: primary),
+                ),
+                child: Text(
+                  template.type.displayName,
+                  style: TextStyle(
+                    color: isSelected ? Colors.white : primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
       ),
     );
   }
