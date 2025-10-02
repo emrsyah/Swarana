@@ -1,12 +1,16 @@
 // CustomBottomNavigation.dart
 
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:iconsax_plus/iconsax_plus.dart';
 import 'package:swarana/common/constant/assets.dart'; // Pastikan path ini benar
 
+import '../services/gemini_suggestion_service.dart';
 import '../services/speech_service.dart'; // Pastikan path ini benar
 
 class CustomBottomNavigation extends StatefulWidget {
@@ -155,10 +159,21 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
   double _currentFontSize = 20.0;
   final DraggableScrollableController _sheetController = DraggableScrollableController();
   bool _isFullScreen = false;
+  late final FlutterTts _flutterTts;
+  GeminiSuggestionService? _suggestionService;
+  List<String> _suggestions = const [];
+  bool _isFetchingSuggestions = false;
+  String? _suggestionError;
+  String? _currentPrompt;
+  bool _hasExpandedForCurrentResult = false;
+  bool _hasCompletedCurrentPrompt = false;
+  bool _isSuggestionFetchQueued = false;
 
   @override
   void initState() {
     super.initState();
+    _flutterTts = FlutterTts();
+    unawaited(_configureTts());
     _sheetController.addListener(_updateFullScreenState);
     _startSession();
   }
@@ -188,7 +203,23 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
   }
 
   Future<void> _startListening() async {
+    if (mounted) {
+      setState(() {
+        _suggestions = const [];
+        _suggestionError = null;
+        _isFetchingSuggestions = false;
+        _currentPrompt = null;
+        _hasExpandedForCurrentResult = false;
+        _hasCompletedCurrentPrompt = false;
+        _isSuggestionFetchQueued = false;
+      });
+    }
     await _speechService.startListening(pauseFor: const Duration(seconds: 4));
+  }
+
+  Future<void> _configureTts() async {
+    await _flutterTts.setLanguage('id-ID');
+    await _flutterTts.setSpeechRate(0.5);
   }
 
   @override
@@ -196,6 +227,7 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
     _speechService.stopListening();
     _sheetController.removeListener(_updateFullScreenState);
     _sheetController.dispose();
+    unawaited(_flutterTts.stop());
     super.dispose();
   }
 
@@ -238,6 +270,7 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
               maxChildSize: 0.95,
               expand: false,
               builder: (_, scrollController) {
+                _handleSpeechLifecycle(isListening: isListening, recognizedText: recognizedText);
                 return Container(
                   decoration: const BoxDecoration(
                     color: Colors.white,
@@ -290,6 +323,106 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
         );
       },
     );
+  }
+
+  void _handleSpeechLifecycle({required bool isListening, required String recognizedText}) {
+    if (isListening) {
+      _hasExpandedForCurrentResult = false;
+      return;
+    }
+
+    final trimmed = recognizedText.trim();
+    if (trimmed.isEmpty) return;
+
+    if (!_hasExpandedForCurrentResult) {
+      _hasExpandedForCurrentResult = true;
+      _expandSheetFully();
+    }
+
+    _scheduleSuggestionFetch(trimmed);
+  }
+
+  void _scheduleSuggestionFetch(String prompt, {bool force = false}) {
+    if (!force &&
+        _currentPrompt == prompt &&
+        (_isFetchingSuggestions || _hasCompletedCurrentPrompt || _isSuggestionFetchQueued)) {
+      return;
+    }
+    _currentPrompt = prompt;
+    _hasCompletedCurrentPrompt = false;
+    _isSuggestionFetchQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _isSuggestionFetchQueued = false;
+      _fetchSuggestions(prompt);
+    });
+  }
+
+  Future<void> _fetchSuggestions(String prompt) async {
+    if (!mounted) return;
+    setState(() {
+      _isFetchingSuggestions = true;
+      _suggestionError = null;
+      _suggestions = const [];
+    });
+
+    try {
+      _suggestionService ??= GeminiSuggestionService();
+      final results = await _suggestionService!.suggestionsFromTranscript(prompt);
+      if (!mounted) return;
+      setState(() {
+        _suggestions = results;
+      });
+    } on SuggestionGenerationException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _suggestionError = error.message;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _suggestionError = 'Terjadi kesalahan: $error';
+      });
+    } finally {
+      _hasCompletedCurrentPrompt = true;
+      if (mounted) {
+        setState(() {
+          _isFetchingSuggestions = false;
+        });
+      } else {
+        _isFetchingSuggestions = false;
+      }
+    }
+  }
+
+  void _expandSheetFully() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      double? size;
+      try {
+        size = _sheetController.size;
+      } catch (_) {
+        size = null;
+      }
+      if (size != null && size >= 0.9) return;
+      _sheetController.animateTo(
+        0.95,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      ).catchError((_) {});
+    });
+  }
+
+  void _retrySuggestions() {
+    final prompt = _currentPrompt;
+    if (prompt == null) return;
+    _scheduleSuggestionFetch(prompt, force: true);
+  }
+
+  Future<void> _speakSuggestion(String text) async {
+    final phrase = text.trim();
+    if (phrase.isEmpty) return;
+    await _flutterTts.stop();
+    await _flutterTts.speak(phrase);
   }
 
   // MODIFIKASI: Widget ini sekarang hanya berisi bagian yang di-scroll
@@ -384,19 +517,32 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
   }
 
   Widget _buildSuggestionGrid() {
-    final suggestions = [
-      'Saya baik-baik saja',
-      'Saya merasa pusing',
-      'Saya merasa mual',
-      'Saya membutuhkan bantuan',
-      'Saya butuh istirahat',
-      'Saya merasa lelah',
-    ];
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(color: HexColor('#3C37AF').withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
+    Widget content;
+    if (_isFetchingSuggestions) {
+      content = const Center(child: CircularProgressIndicator());
+    } else if (_suggestionError != null) {
+      content = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _suggestionError!,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 12),
+          TextButton(onPressed: _retrySuggestions, child: const Text('Coba lagi')),
+        ],
+      );
+    } else if (_suggestions.isEmpty) {
+      content = const Center(
+        child: Text(
+          'Saran belum tersedia untuk transkrip ini.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+        ),
+      );
+    } else {
+      content = GridView.builder(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
           childAspectRatio: 1.5,
@@ -404,14 +550,23 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
           mainAxisSpacing: 12,
         ),
         shrinkWrap: true,
-        itemCount: suggestions.length,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: _suggestions.length,
         itemBuilder: (context, index) {
-          final suggestion = suggestions[index];
-          // final isSelected = _selectedText == sentence.text;
-
-          return _SuggestionCard(suggestion: suggestion);
+          final suggestion = _suggestions[index];
+          return _SuggestionCard(
+            suggestion: suggestion,
+            onTap: () => _speakSuggestion(suggestion),
+          );
         },
-      ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(color: HexColor('#3C37AF').withOpacity(0.05), borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.all(16),
+      child: content,
     );
   }
 
@@ -443,28 +598,32 @@ class _ListeningModalState extends State<ListeningModal> with TickerProviderStat
 
 class _SuggestionCard extends StatelessWidget {
   final String suggestion;
+  final VoidCallback onTap;
 
-  const _SuggestionCard({required this.suggestion});
+  const _SuggestionCard({required this.suggestion, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 4, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Center(
-        child: Text(
-          suggestion,
-          textAlign: TextAlign.center,
-          maxLines: 4,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(color: Colors.grey.withOpacity(0.1), spreadRadius: 1, blurRadius: 4, offset: const Offset(0, 2)),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            suggestion,
+            textAlign: TextAlign.center,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: Colors.black87),
+          ),
         ),
       ),
     );
