@@ -1,12 +1,17 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:hexcolor/hexcolor.dart';
+import 'package:volume_controller/volume_controller.dart';
+
 import '../../../../common/constant/assets.dart';
-import '../widgets/word_board.dart';
+import '../../../../core/services/board_input_focus_service.dart';
+import '../../../../core/services/volume_alert_service.dart';
 import '../../domain/entities/word_item.dart';
+import '../widgets/word_board.dart';
 
 class BoardPage extends StatefulWidget {
   const BoardPage({super.key});
@@ -17,7 +22,9 @@ class BoardPage extends StatefulWidget {
 
 class _BoardPageState extends State<BoardPage> {
   final TextEditingController _textController = TextEditingController();
+  final FocusNode _inputFocusNode = FocusNode();
   late final FlutterTts _flutterTts;
+  late final VoidCallback _focusRequestListener;
   int _currentTemplateIndex = 0;
 
   // Template data - organized for easy extension
@@ -249,6 +256,8 @@ class _BoardPageState extends State<BoardPage> {
     super.initState();
     _flutterTts = FlutterTts();
     unawaited(_configureTts());
+    _focusRequestListener = _handleFocusRequest;
+    BoardInputFocusService.requests.addListener(_focusRequestListener);
   }
 
   void _addTextToInput(String text) {
@@ -269,12 +278,16 @@ class _BoardPageState extends State<BoardPage> {
     final text = _textController.text.trim();
     if (text.isEmpty) return;
     await _flutterTts.stop();
+    print('TEXT: $text');
+    await _checkVolumeAndWarn();
     await _flutterTts.speak(text);
   }
 
   @override
   void dispose() {
     _textController.dispose();
+    _inputFocusNode.dispose();
+    BoardInputFocusService.requests.removeListener(_focusRequestListener);
     unawaited(_flutterTts.stop());
     super.dispose();
   }
@@ -302,6 +315,7 @@ class _BoardPageState extends State<BoardPage> {
                 decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(12)),
                 child: TextField(
                   controller: _textController,
+                  focusNode: _inputFocusNode,
                   style: TextStyle(fontSize: 12),
                   decoration: InputDecoration(
                     hintText: 'Tulis lalu klik gambar untuk disuarakan',
@@ -348,6 +362,29 @@ class _BoardPageState extends State<BoardPage> {
         ),
       ),
     );
+  }
+
+  void _handleFocusRequest() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      FocusScope.of(context).requestFocus(_inputFocusNode);
+    });
+  }
+
+  Future<void> _checkVolumeAndWarn() async {
+    try {
+      final volume = await VolumeController.instance.getVolume();
+      if (volume <= 0.2 && mounted) {
+        VolumeAlertService.showLowVolume(context);
+      }
+    } on MissingPluginException {
+      print('ERROR CHECKING VOLUME MISSING PLUGIN');
+      // Volume controller not registered for this platform.
+    } catch (e) {
+      print('ERROR CHECKING VOLUME $e');
+      // ignore unsupported platform volume queries
+    }
   }
 }
 
