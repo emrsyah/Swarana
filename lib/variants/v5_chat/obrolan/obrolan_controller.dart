@@ -41,6 +41,9 @@ class ObrolanController extends ChangeNotifier {
   int _ids = 0;
   bool _disposed = false;
 
+  /// Unique across sessions, so a resumed chat never reuses an id.
+  String _newId() => '${DateTime.now().microsecondsSinceEpoch}-${_ids++}';
+
   List<String> suggestions = const [];
   SuggestState suggestState = SuggestState.hidden;
   Timer? _suggestDebounce;
@@ -115,7 +118,7 @@ class ObrolanController extends ChangeNotifier {
       existing.lowConfidence = e.lowConfidence;
     } else {
       final m = ChatMessage(
-        id: 'm${_ids++}',
+        id: _newId(),
         speakerId: sid,
         text: e.text,
         time: DateTime.now(),
@@ -150,7 +153,7 @@ class ObrolanController extends ChangeNotifier {
     if (t.isEmpty) return;
     final src = source ?? c.majority;
     final m = ChatMessage(
-      id: 'm${_ids++}',
+      id: _newId(),
       speakerId: Speaker.meId,
       text: t,
       time: DateTime.now(),
