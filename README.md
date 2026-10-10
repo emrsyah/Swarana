@@ -32,9 +32,17 @@ Hold the screen title for 2 seconds ("Obrolan" in v5, the top hint text on the v
 2. After the variant's scenarios: SUS (Indonesian, Sharfina & Santoso 2016) then NASA-TLX raw.
 3. Rest screen (countdown; long-press the button to skip), then the other variant.
 4. Scenario order rotates per participant (Latin square). Each scenario has parallel forms A/B; a participant gets A in one variant and B in the other.
-5. Task time runs from *Mulai* to the end tap, minus any time a scripted partner line waited for the app to listen.
+5. Task time (`duration_ms`) is raw, from *Mulai* to the end tap. Time a scripted partner line waited for the app to listen is exported separately (`waited_ms`) and not subtracted, because in v3 it includes the mic re-tap cost being compared.
 6. Input mix: every sent message is bucketed by where most characters came from (keyboard / AI suggestion / board), like the 84 / 11 / 5 % split in iteration 3.
 7. In study mode v5 hides face mode, quick phrases and the "saya sedang mengetik" offer, since v3 has no equivalent. The comparison is "v3 vs v5 as designed".
+
+**Known differences to report as limitations** (kept so each variant behaves as designed):
+- AI suggestions: v3 shows up to 6 from the last transcript; v5 shows 3 using the whole conversation (scripted mode gives both the same 3).
+- Listening: v3 listens once per tap (30 s); v5 listens continuously and pauses while speaking.
+- Haptics: v3 vibrates on an empty capture; v5 on every partner message, TTS done, and alerts.
+- v3 uses its own TTS instance (same rate 0.5) and does not pause listening while speaking.
+- Form order uses a different participant bit than variant order, so forms are not confounded with variants (P00/P01 A→B, P02/P03 B→A).
+- The event log includes events outside tasks; filter on `in_task` when analysing.
 
 **Primary mode: a human partner** reads the script cards below. *Lawan bicara otomatis* plays the same lines as fake speech, for pilots and demos only.
 

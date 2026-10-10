@@ -42,26 +42,14 @@ class MessageBubble extends StatelessWidget {
     final color = speakerColor(speaker.colorIndex);
     final body = TextStyle(fontSize: 17 * textScale, height: 1.45, color: V5Colors.ink);
 
-    final bubble = GestureDetector(
-      onLongPress: message.partial ? null : onMenu,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+    final radius = BorderRadius.only(
+      topLeft: Radius.circular(me ? V5Radius.bubble : 4),
+      topRight: Radius.circular(me ? 4 : V5Radius.bubble),
+      bottomLeft: const Radius.circular(V5Radius.bubble),
+      bottomRight: const Radius.circular(V5Radius.bubble),
+    );
+    final content = Padding(
         padding: const EdgeInsets.fromLTRB(V5Space.lg, V5Space.md, V5Space.lg, V5Space.md),
-        decoration: BoxDecoration(
-          color: me ? V5Colors.myBubble : V5Colors.partnerBubble,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(me ? V5Radius.bubble : 4),
-            topRight: Radius.circular(me ? 4 : V5Radius.bubble),
-            bottomLeft: const Radius.circular(V5Radius.bubble),
-            bottomRight: const Radius.circular(V5Radius.bubble),
-          ),
-          border: Border(
-            left: BorderSide(color: me ? V5Colors.myBubble : color, width: me ? 1 : 4),
-            top: BorderSide(color: me ? V5Colors.myBubble : V5Colors.border),
-            right: BorderSide(color: me ? V5Colors.myBubble : V5Colors.border),
-            bottom: BorderSide(color: me ? V5Colors.myBubble : V5Colors.border),
-          ),
-        ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(
             message.text,
@@ -78,6 +66,34 @@ class MessageBubble extends StatelessWidget {
             _InlineAction(icon: Icons.auto_awesome, label: Copy.sederhanakan, onTap: onSimplify),
           if (me) _TtsStatus(state: message.tts, onSpeak: onSpeak),
         ]),
+    );
+
+    // Uniform border (Flutter cannot round mixed-colour borders); the speaker
+    // colour is a separate 4 px bar on the left of partner bubbles.
+    final bubble = Semantics(
+      onLongPressHint: 'Pilihan pesan',
+      onLongPress: message.partial ? null : onMenu,
+      child: GestureDetector(
+        onLongPress: message.partial ? null : onMenu,
+        child: Container(
+          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+          decoration: BoxDecoration(
+            color: me ? V5Colors.myBubble : V5Colors.partnerBubble,
+            borderRadius: radius,
+            border: Border.all(color: me ? V5Colors.myBubble : V5Colors.border),
+          ),
+          child: me
+              ? content
+              : ClipRRect(
+                  borderRadius: radius,
+                  child: IntrinsicHeight(
+                    child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+                      Container(width: 4, color: color),
+                      Flexible(child: content),
+                    ]),
+                  ),
+                ),
+        ),
       ),
     );
 
@@ -102,11 +118,12 @@ class MessageBubble extends StatelessWidget {
                 onTap: onRename,
                 borderRadius: BorderRadius.circular(8),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(minHeight: 36),
+                  constraints: const BoxConstraints(minHeight: minTouch),
+                  // Name in ink for contrast; colour stays on avatar and bar.
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(speaker.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: color)),
+                    Text(speaker.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: V5Colors.ink)),
                     const SizedBox(width: 4),
-                    Icon(Icons.edit_outlined, size: 14, color: color.withValues(alpha: 0.7)),
+                    const Icon(Icons.edit_outlined, size: 16, color: V5Colors.muted),
                   ]),
                 ),
               ),
@@ -128,8 +145,9 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Initial from the name, or the number for "Pembicara 2".
-    final parts = name.trim().split(' ');
-    final initial = RegExp(r'^\d+$').hasMatch(parts.last) ? parts.last : name.trim().characters.first.toUpperCase();
+    final n = name.trim().isEmpty ? '?' : name.trim();
+    final parts = n.split(' ');
+    final initial = RegExp(r'^\d+$').hasMatch(parts.last) ? parts.last : n.characters.first.toUpperCase();
     return ExcludeSemantics(
       child: CircleAvatar(
         radius: 18,
@@ -175,7 +193,7 @@ class _InlineAction extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(8),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 36),
+            constraints: const BoxConstraints(minHeight: minTouch),
             child: Row(mainAxisSize: MainAxisSize.min, children: [
               Icon(icon, size: 16, color: V5Colors.primary),
               const SizedBox(width: 6),
@@ -246,7 +264,18 @@ class _Wave extends StatefulWidget {
 }
 
 class _WaveState extends State<_Wave> with SingleTickerProviderStateMixin {
-  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..repeat();
+  late final _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Static bars when the system asks for reduced motion.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
 
   @override
   void dispose() {

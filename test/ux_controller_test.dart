@@ -53,8 +53,9 @@ void main() {
   test('scenario order and forms rotate by participant', () {
     expect(cfg('P01').scenarioOrder(), ['bank', 'cs', 'warung']);
     expect(cfg('P03').scenarioOrder(), ['warung', 'bank', 'cs']);
-    expect(cfg('P02').formFor(0), 'A');
-    expect(cfg('P02').formFor(1), 'B');
+    // Form order follows bit 1, variant order bit 0: not confounded.
+    expect([for (final p in ['P00', 'P01', 'P02', 'P03']) cfg(p).formFor(0)], ['A', 'A', 'B', 'B']);
+    expect(cfg('P02').formFor(1), 'A');
   });
 
   test('rage clicks counted only while a task runs', () {
@@ -74,14 +75,15 @@ void main() {
     expect(c.pending!.taps, 3);
   });
 
-  test('time excludes scripted wait; auto signal is a hint only', () {
+  test('time is raw, scripted wait recorded separately; auto signal is a hint only', () {
     c.startStudy(cfg('P03'));
     c.startTask();
     now = now.add(const Duration(seconds: 40));
     host.wait = const Duration(seconds: 10);
     c.signal('done');
     expect(c.phase, StudyPhase.outcome);
-    expect(c.pending!.duration, const Duration(seconds: 30));
+    expect(c.pending!.duration, const Duration(seconds: 40));
+    expect(c.pending!.waited, const Duration(seconds: 10));
     expect(c.pending!.outcome, TaskOutcome.success);
     expect(c.pending!.autoDetected, isTrue);
 

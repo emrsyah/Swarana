@@ -30,7 +30,9 @@ class _ResearcherPanelState extends State<ResearcherPanel> {
 
   Future<void> _loadUnfinished() async {
     final all = await AppHandle.of(context).storage.studies();
-    final open = all.where((s) => s['finished'] != true && s['config'] != null).toList();
+    final open = all
+        .where((s) => s['finished'] != true && s['aborted'] != true && s['config'] != null)
+        .toList();
     if (mounted) setState(() => _unfinished = open.isEmpty ? null : open.last);
   }
 

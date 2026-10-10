@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../core/models/message.dart';
@@ -66,10 +67,18 @@ class _ObrolanPageState extends State<ObrolanPage> {
     });
   }
 
+  String? _announced;
+
   void _onChange() {
     final c = _c!;
     if (c.messages.length > _lastCount && _awayFromBottom) _newBelow = true;
     _lastCount = c.messages.length;
+    // Screen readers: announce each finished partner message once.
+    final last = c.messages.where((m) => !m.isMe && !m.partial).lastOrNull;
+    if (last != null && last.id != _announced) {
+      _announced = last.id;
+      SemanticsService.sendAnnouncement(View.of(context), '${c.speaker(last.speakerId).name}: ${last.text}', TextDirection.ltr);
+    }
     setState(() {});
   }
 
@@ -109,7 +118,9 @@ class _ObrolanPageState extends State<ObrolanPage> {
     );
   }
 
-  Future<void> _onMenu(ChatMessage m) => showMessageMenu(context, message: m, onAction: (a) async {
+  // "Minta ulangi" is a quick phrase: hidden in study mode (v3 has none).
+  Future<void> _onMenu(ChatMessage m) =>
+      showMessageMenu(context, message: m, allowAskRepeat: !_c!.studyMode, onAction: (a) async {
         final c = _c!;
         switch (a) {
           case MessageAction.speak:
@@ -142,16 +153,19 @@ class _ObrolanPageState extends State<ObrolanPage> {
   Future<void> _endChat() async {
     final c = _c!;
     if (c.isEmpty) return;
+    final wasListening = c.sttStatus == SttStatus.listening;
     await c.s.stt.pause();
     if (!mounted) return;
-    final r = await showSaveDialog(context, heading: 'Akhiri dan simpan obrolan?', suggestedTitle: c.suggestTitle());
+    final suggested = c.suggestTitle();
+    final r = await showSaveDialog(context, heading: 'Akhiri dan simpan obrolan?', suggestedTitle: suggested);
     if (!mounted) return;
     if (r == null) {
-      await c.s.stt.start();
+      // Batal: only resume if it was listening before (never a false "listening").
+      if (wasListening) await c.s.stt.start();
       return;
     }
     if (r.$1 == SaveChoice.save) {
-      await c.save(r.$2);
+      await c.save(r.$2.trim().isEmpty ? await suggested : r.$2);
       if (mounted) _snack('Obrolan disimpan di Riwayat');
     }
     if (mounted) Navigator.of(context).pushReplacementNamed(V5Routes.obrolan);

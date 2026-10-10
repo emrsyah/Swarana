@@ -60,24 +60,28 @@ class SuggestionsPanel extends StatelessWidget {
               const Expanded(child: Text('Saran tidak tersedia saat ini.', style: TextStyle(color: V5Colors.muted))),
               TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
             ]),
-          _ => Wrap(spacing: V5Space.sm, runSpacing: V5Space.sm, children: [
-              for (final s in items)
-                Semantics(
-                  button: true,
-                  hint: 'Ketuk untuk kirim, tekan lama untuk ubah dulu',
-                  child: GestureDetector(
-                    onLongPress: () => onEdit(s),
-                    child: OutlinedButton(
-                      onPressed: () => onSend(s),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: V5Colors.surface,
-                        padding: const EdgeInsets.symmetric(horizontal: V5Space.lg, vertical: 10),
+          // Capped height so long suggestions at large text never push the
+          // composer off screen.
+          _ => ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 150),
+              child: SingleChildScrollView(
+                child: Wrap(spacing: V5Space.sm, runSpacing: V5Space.sm, children: [
+                  for (final s in items)
+                    Semantics(
+                      hint: 'Ketuk untuk kirim, tekan lama untuk ubah dulu',
+                      child: OutlinedButton(
+                        onPressed: () => onSend(s),
+                        onLongPress: () => onEdit(s),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: V5Colors.surface,
+                          padding: const EdgeInsets.symmetric(horizontal: V5Space.lg, vertical: 10),
+                        ),
+                        child: Text(s, style: const TextStyle(fontSize: 15)),
                       ),
-                      child: Text(s, style: const TextStyle(fontSize: 15)),
                     ),
-                  ),
-                ),
-            ]),
+                ]),
+              ),
+            ),
         },
       ]),
     );

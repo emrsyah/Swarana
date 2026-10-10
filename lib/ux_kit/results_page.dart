@@ -128,8 +128,8 @@ class _Summary extends StatelessWidget {
             _mean(tasks(v5, sc).map((r) => r.outcome.isSuccess ? 100 : 0))),
       row('SEQ (1–7)', _mean(tasks(v3).map((r) => r.seq ?? 0).where((e) => e > 0)),
           _mean(tasks(v5).map((r) => r.seq ?? 0).where((e) => e > 0)), digits: 1),
-      row('SUS', _mean(studies.map((s) => s.block(v3)?.sus).whereType<int>()),
-          _mean(studies.map((s) => s.block(v5)?.sus).whereType<int>()), digits: 1),
+      row('SUS', _mean(studies.map((s) => s.block(v3)?.sus).whereType<double>()),
+          _mean(studies.map((s) => s.block(v5)?.sus).whereType<double>()), digits: 1),
       row('NASA-TLX raw', _mean(studies.map((s) => s.block(v3)?.tlxRaw).whereType<double>()),
           _mean(studies.map((s) => s.block(v5)?.tlxRaw).whereType<double>()), digits: 1),
     ];

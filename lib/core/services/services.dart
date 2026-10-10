@@ -66,7 +66,7 @@ class Services {
   }
 
   void dispose() {
-    tts.stop();
+    tts.dispose();
     stt.dispose();
   }
 

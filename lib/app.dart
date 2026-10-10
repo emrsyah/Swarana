@@ -151,7 +151,9 @@ class _SwaranaAppState extends State<SwaranaApp> implements AppHandle, UxHost {
             ux: ux,
             scenarioTitle: (id) => scenarios[id]?.title ?? id,
             scenarioInstruction: (id, form) => scenarios[id]?.forms[form]?.instruction ?? '',
-            onOpenResults: () => _navKey.currentState?.pushNamed('/results'),
+            // closeDone() rebuilds the app with a new navigator; push after it mounts.
+            onOpenResults: () => WidgetsBinding.instance
+                .addPostFrameCallback((_) => _navKey.currentState?.pushNamed('/results')),
             child: child!,
           ),
         ),

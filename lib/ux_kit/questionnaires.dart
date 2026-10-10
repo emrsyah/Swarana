@@ -10,18 +10,18 @@ const susItems = [
   'Saya merasa ada banyak hal yang tidak konsisten (tidak serasi) pada sistem ini.',
   'Saya merasa orang lain akan memahami cara menggunakan sistem ini dengan cepat.',
   'Saya merasa sistem ini membingungkan.',
-  'Saya merasa tidak ada hambatan dalam menggunakan sistem ini.',
+  'Saya merasa sangat percaya diri untuk menggunakan sistem ini.',
   'Saya perlu membiasakan diri terlebih dahulu sebelum menggunakan sistem ini.',
 ];
 
 /// Standard SUS: odd items (a-1), even items (5-a), sum × 2.5.
-int susScore(List<int> answers) {
+double susScore(List<int> answers) {
   assert(answers.length == 10);
   var sum = 0;
   for (var i = 0; i < 10; i++) {
     sum += i.isEven ? answers[i] - 1 : 5 - answers[i];
   }
-  return (sum * 2.5).round();
+  return sum * 2.5;
 }
 
 /// NASA-TLX raw (unweighted). Performance: 0 = sempurna, 100 = gagal.
@@ -44,7 +44,7 @@ double tlxRaw(Map<String, int> values) =>
 class SusForm extends StatefulWidget {
   const SusForm({super.key, required this.variantLabel, required this.onDone});
   final String variantLabel;
-  final void Function(List<int> answers, int score) onDone;
+  final void Function(List<int> answers, double score) onDone;
 
   @override
   State<SusForm> createState() => _SusFormState();

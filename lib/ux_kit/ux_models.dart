@@ -44,8 +44,10 @@ class StudyConfig {
     return [for (var i = 0; i < n; i++) scenarioIds[(i + shift) % n]];
   }
 
-  /// Parallel form for a block: even participants get A then B.
-  String formFor(int block) => (index + block).isEven ? 'A' : 'B';
+  /// Parallel form for a block. Uses bit 1 of the index while variant order
+  /// is suggested from bit 0, so form and variant are not confounded:
+  /// P0 A→B, P1 A→B, P2 B→A, P3 B→A, ...
+  String formFor(int block) => ((index ~/ 2) + block).isEven ? 'A' : 'B';
 
   Map<String, Object?> toJson() => {
         'participant': participantId,
@@ -75,6 +77,8 @@ class TaskResult {
     required this.autoDetected,
     required this.duration,
     required this.waited,
+    this.block = 0,
+    this.position = 0,
     required this.path,
     required this.taps,
     required this.rageClicks,
@@ -92,6 +96,10 @@ class TaskResult {
   /// Active time: start tap to end, minus scripted waiting.
   final Duration duration;
   final Duration waited;
+
+  /// 0 = first variant block; position within the block (order effects).
+  final int block;
+  final int position;
   final List<String> path;
   final int taps;
   final int rageClicks;
@@ -110,6 +118,8 @@ class TaskResult {
         'auto_detected': autoDetected,
         'duration_ms': duration.inMilliseconds,
         'waited_ms': waited.inMilliseconds,
+        'block_index': block,
+        'task_position': position,
         'path': path,
         'taps': taps,
         'rage_clicks': rageClicks,
@@ -126,6 +136,8 @@ class TaskResult {
         autoDetected: j['auto_detected'] == true,
         duration: Duration(milliseconds: (j['duration_ms'] as num).toInt()),
         waited: Duration(milliseconds: (j['waited_ms'] as num?)?.toInt() ?? 0),
+        block: (j['block_index'] as num?)?.toInt() ?? 0,
+        position: (j['task_position'] as num?)?.toInt() ?? 0,
         path: (j['path'] as List).cast<String>(),
         taps: (j['taps'] as num).toInt(),
         rageClicks: (j['rage_clicks'] as num).toInt(),
@@ -141,7 +153,7 @@ class VariantBlock {
   final AppVariant variant;
   final List<TaskResult> tasks;
   List<int>? susAnswers;
-  int? sus;
+  double? sus;
   Map<String, int>? tlx;
   double? tlxRaw;
 
@@ -159,7 +171,7 @@ class VariantBlock {
         tasks: (j['tasks'] as List).map((e) => TaskResult.fromJson((e as Map).cast())).toList(),
       )
         ..susAnswers = (j['sus_answers'] as List?)?.cast<int>()
-        ..sus = (j['sus'] as num?)?.toInt()
+        ..sus = (j['sus'] as num?)?.toDouble()
         ..tlx = (j['tlx'] as Map?)?.map((k, v) => MapEntry(k as String, (v as num).toInt()))
         ..tlxRaw = (j['tlx_raw'] as num?)?.toDouble();
 }

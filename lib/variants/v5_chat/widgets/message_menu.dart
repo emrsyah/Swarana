@@ -13,13 +13,14 @@ Future<void> showMessageMenu(
   BuildContext context, {
   required ChatMessage message,
   required void Function(MessageAction) onAction,
+  bool allowAskRepeat = true,
 }) {
   final actions = <(MessageAction, IconData, String)>[
     if (message.isMe) (MessageAction.speak, Icons.volume_up, Copy.bunyikanLagi),
     (MessageAction.simplify, Icons.auto_awesome, Copy.sederhanakan),
     (MessageAction.explain, Icons.help_outline, '${Copy.tanyaArti} kata'),
     if (!message.isMe) (MessageAction.correct, Icons.edit_outlined, 'Perbaiki tulisan'),
-    if (!message.isMe) (MessageAction.askRepeat, Icons.replay, Copy.mintaUlangi),
+    if (!message.isMe && allowAskRepeat) (MessageAction.askRepeat, Icons.replay, Copy.mintaUlangi),
     (MessageAction.copy, Icons.copy, Copy.salin),
   ];
   return showModalBottomSheet<void>(

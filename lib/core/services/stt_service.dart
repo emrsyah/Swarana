@@ -33,6 +33,9 @@ abstract class SttService {
 
   Future<bool> init();
 
+  /// Mode of the last [start] call.
+  bool get continuous;
+
   /// [continuous] keeps restarting after each utterance (v5). v3 uses a
   /// single 30 s session, as in iteration 3.
   Future<void> start({bool continuous = true});
@@ -70,6 +73,8 @@ class LiveSttService implements SttService {
   Stream<SttEvent> get events => _events.stream;
   @override
   String get speakerId => _speaker;
+  @override
+  bool get continuous => _continuous;
 
   @override
   Future<bool> init() async {
@@ -106,7 +111,7 @@ class LiveSttService implements SttService {
 
   void _onResult(SpeechRecognitionResult r) {
     final text = r.recognizedWords.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _events.isClosed) return;
     _busyBackoffMs = 300;
     _events.add(SttEvent(text,
         isFinal: r.finalResult, speakerId: _speaker, confidence: r.confidence));

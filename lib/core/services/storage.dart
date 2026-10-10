@@ -32,20 +32,36 @@ class Storage {
     }
   }
 
+  /// All writes run one at a time, so read-modify-write never interleaves.
+  Future<void> _queue = Future.value();
+
+  Future<void> _serial(Future<void> Function() op) {
+    final next = _queue.then((_) => op());
+    _queue = next.catchError((_) {});
+    return next;
+  }
+
+  /// Write to a temp file then rename, so a crash never leaves half a file.
+  static Future<void> _atomic(File f, String content) async {
+    final tmp = File('${f.path}.tmp');
+    await tmp.writeAsString(content, flush: true);
+    await tmp.rename(f.path);
+  }
+
   Future<void> _writeList(String name, List<Map<String, Object?>> list) =>
-      _file(name).writeAsString(jsonEncode(list));
+      _atomic(_file(name), jsonEncode(list));
 
-  Future<void> _upsert(String name, Map<String, Object?> item) async {
-    final list = await _readList(name);
-    final i = list.indexWhere((e) => e['id'] == item['id']);
-    i >= 0 ? list[i] = item : list.insert(0, item);
-    await _writeList(name, list);
-  }
+  Future<void> _upsert(String name, Map<String, Object?> item) => _serial(() async {
+        final list = await _readList(name);
+        final i = list.indexWhere((e) => e['id'] == item['id']);
+        i >= 0 ? list[i] = item : list.insert(0, item);
+        await _writeList(name, list);
+      });
 
-  Future<void> _remove(String name, String id) async {
-    final list = await _readList(name)..removeWhere((e) => e['id'] == id);
-    await _writeList(name, list);
-  }
+  Future<void> _remove(String name, String id) => _serial(() async {
+        final list = await _readList(name)..removeWhere((e) => e['id'] == id);
+        await _writeList(name, list);
+      });
 
   // ---------------- Chats & transcripts ----------------
 
@@ -69,12 +85,15 @@ class Storage {
 
   // ---------------- Study ----------------
 
-  Future<void> appendEvent(String participantId, Map<String, Object?> e) =>
+  Future<void> appendEvent(String participantId, Map<String, Object?> e) => _serial(() =>
       File('${_study.path}/$participantId.events.jsonl')
-          .writeAsString('${jsonEncode(e)}\n', mode: FileMode.append);
+          .writeAsString('${jsonEncode(e)}\n', mode: FileMode.append));
 
-  Future<void> saveStudy(String participantId, Map<String, Object?> json) =>
-      File('${_study.path}/$participantId.json').writeAsString(jsonEncode(json));
+  /// The snapshot is taken now; the write happens in order after earlier ones.
+  Future<void> saveStudy(String participantId, Map<String, Object?> json) {
+    final content = jsonEncode(json);
+    return _serial(() => _atomic(File('${_study.path}/$participantId.json'), content));
+  }
 
   Future<List<Map<String, Object?>>> studies() async {
     final out = <Map<String, Object?>>[];

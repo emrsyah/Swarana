@@ -31,8 +31,17 @@ class ScriptedStt implements SttService {
   bool _done = false;
   bool _continuous = true;
   DateTime? _blockedSince;
-  Duration waited = Duration.zero;
+  Duration _waited = Duration.zero;
   String _speaker = 's1';
+  bool _disposed = false;
+
+  /// Time partner lines spent waiting for the app to listen, including a wait
+  /// still open now. Exported per task for analysis; task time itself is NOT
+  /// reduced by it, so v3's re-tap overhead stays part of the comparison.
+  Duration get waited {
+    final since = _blockedSince;
+    return since == null ? _waited : _waited + DateTime.now().difference(since);
+  }
 
   @override
   ValueListenable<SttStatus> get status => _status;
@@ -42,6 +51,8 @@ class ScriptedStt implements SttService {
   Stream<SttEvent> get events => _events.stream;
   @override
   String get speakerId => _speaker;
+  @override
+  bool get continuous => _continuous;
 
   bool get isWaitingForUser => _waitingForUser;
   bool get isDone => _done;
@@ -81,13 +92,13 @@ class ScriptedStt implements SttService {
   void _unblock() {
     final since = _blockedSince;
     if (since != null) {
-      waited += DateTime.now().difference(since);
+      _waited += DateTime.now().difference(since);
       _blockedSince = null;
     }
   }
 
   Future<void> _pump() async {
-    if (_playing || _waitingForUser || _done) return;
+    if (_playing || _waitingForUser || _done || _disposed) return;
     _playing = true;
     while (_index < form.turns.length) {
       final turn = form.turns[_index];
@@ -100,6 +111,7 @@ class ScriptedStt implements SttService {
         break;
       }
       await _speak(turn);
+      if (_disposed) return;
       _index++;
       // v3 single-shot listening ends after one utterance.
       if (!_continuous) {
@@ -114,10 +126,18 @@ class ScriptedStt implements SttService {
     _speaker = turn.speaker ?? 's1';
     final words = turn.text!.split(' ');
     for (var i = 1; i <= words.length; i++) {
+      // A pause mid-line holds the rest of the line (and counts as waiting).
+      while (_status.value != SttStatus.listening && !_disposed) {
+        _blockedSince ??= DateTime.now();
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      _unblock();
+      if (_disposed) return;
       _level.value = 0.4 + (i % 3) * 0.2;
       _events.add(SttEvent(words.take(i).join(' '), isFinal: false, speakerId: _speaker));
       await Future<void>.delayed(wordDelay);
     }
+    if (_disposed) return;
     _level.value = 0;
     _events.add(SttEvent(turn.text!, isFinal: true, speakerId: _speaker, confidence: 0.95));
   }
@@ -141,7 +161,10 @@ class ScriptedStt implements SttService {
   void setSpeaker(String id) => _speaker = id;
 
   @override
-  void dispose() => _events.close();
+  void dispose() {
+    _disposed = true;
+    _events.close();
+  }
 }
 
 /// Canned AI answers so scripted sessions work offline and give every

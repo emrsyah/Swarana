@@ -68,6 +68,7 @@ class UxController extends ChangeNotifier {
   String _route = '/';
 
   TaskResult? pending;
+  bool _aborted = false;
 
   bool get inStudy => phase != StudyPhase.idle && phase != StudyPhase.done;
   bool get isRunning => phase == StudyPhase.running;
@@ -107,7 +108,13 @@ class UxController extends ChangeNotifier {
     _emit('study_resumed', {'phase': saved.name});
     switch (saved) {
       case StudyPhase.sus || StudyPhase.tlx || StudyPhase.rest:
-        _set(saved == StudyPhase.rest ? StudyPhase.rest : StudyPhase.sus);
+        // Show the variant the questionnaire is about.
+        host?.prepareTask(variant!, scenarios.last, form);
+        if (saved == StudyPhase.rest) {
+          final until = DateTime.tryParse(json['rest_until'] as String? ?? '');
+          restUntil = until ?? _now();
+        }
+        _set(saved);
       default:
         _toBriefing();
     }
@@ -115,8 +122,10 @@ class UxController extends ChangeNotifier {
 
   void abortStudy() {
     _timeout?.cancel();
+    _aborted = true;
     _emit('study_aborted', {});
     _save();
+    _aborted = false;
     _reset();
     host?.endStudy();
   }
@@ -176,8 +185,12 @@ class UxController extends ChangeNotifier {
       variant: variant!,
       outcome: hint ?? (_autoDone ? TaskOutcome.success : TaskOutcome.fail),
       autoDetected: _autoDone,
-      duration: raw - waited < Duration.zero ? Duration.zero : raw - waited,
+      // Raw active time. Scripted waiting is recorded separately, not
+      // subtracted: in v3 it includes the mic re-tap cost the study compares.
+      duration: raw,
       waited: waited,
+      block: blockIndex,
+      position: taskIndex,
       path: List.of(_path),
       taps: _taps,
       rageClicks: _rage,
@@ -211,7 +224,7 @@ class UxController extends ChangeNotifier {
     }
   }
 
-  void submitSus(List<int> answers, int score) {
+  void submitSus(List<int> answers, double score) {
     blocks[blockIndex]
       ..susAnswers = answers
       ..sus = score;
@@ -308,6 +321,8 @@ class UxController extends ChangeNotifier {
         'config': config?.toJson(),
         'started_at': startedAt?.toIso8601String(),
         'finished': phase == StudyPhase.done,
+        'aborted': _aborted,
+        'rest_until': restUntil?.toIso8601String(),
         'cursor': {'block': blockIndex, 'task': taskIndex, 'phase': phase.name},
         'blocks': blocks.map((b) => b.toJson()).toList(),
       };

@@ -38,18 +38,22 @@ class TtsService {
     _tts.setErrorHandler((_) => _finish(TtsState.failed));
   }
 
+  bool _resumeContinuous = true;
+  bool _disposed = false;
+
   void _emit(TtsState s) {
     final id = _current;
-    if (id != null) _updates.add((id: id, state: s));
+    if (id != null && !_disposed) _updates.add((id: id, state: s));
   }
 
   void _finish(TtsState s) {
     _emit(s);
-    if (s == TtsState.done) haptics.done();
+    if (s == TtsState.done && !_disposed) haptics.done();
     _current = null;
-    if (_resumeStt) {
+    if (_resumeStt && !_disposed) {
       _resumeStt = false;
-      stt?.start();
+      // Resume in the mode it was in (v3 single-shot, v5 continuous).
+      stt?.start(continuous: _resumeContinuous);
     }
   }
 
@@ -70,6 +74,7 @@ class TtsService {
     final s = stt;
     if (s != null && s.status.value == SttStatus.listening) {
       _resumeStt = true;
+      _resumeContinuous = s.continuous;
       await s.pause();
     }
     _current = id;
@@ -78,5 +83,15 @@ class TtsService {
     if (r != 1) _finish(TtsState.failed);
   }
 
-  Future<void> stop() => _tts.stop();
+  /// Stops speech without resuming listening (leaving a screen).
+  Future<void> stop() {
+    _resumeStt = false;
+    return _tts.stop();
+  }
+
+  void dispose() {
+    _disposed = true;
+    _resumeStt = false;
+    _tts.stop();
+  }
 }

@@ -50,10 +50,12 @@ class _TranskripPageState extends State<TranskripPage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Runs again on theme/MediaQuery changes: register listeners only once.
+    if (_sub != null) return;
     _s = Services.of(context);
     _s.stt.status.addListener(_rebuild);
-    _sub ??= _s.stt.events.listen(_onStt);
-    _alertSub ??= _s.alerts.stream.listen((k) => setState(() => _alert = k));
+    _sub = _s.stt.events.listen(_onStt);
+    _alertSub = _s.alerts.stream.listen((k) => setState(() => _alert = k));
     _scroll.addListener(() {
       final f = !_scroll.hasClients || _scroll.offset >= _scroll.position.maxScrollExtent - 40;
       if (f != _following) setState(() => _following = f);
