@@ -1,0 +1,52 @@
+{
+  "id": "cs",
+  "title": "Diskusi dengan customer service",
+  "complexity": "chat-heavy",
+  "speakers": {"s1": "CS", "s2": "Supervisor"},
+  "forms": {
+    "A": {
+      "instruction": "Paket kirimanmu belum sampai. Tanyakan ke CS. Nomor pesananmu SWR-4821. Ingat informasi yang diberikan CS, nanti akan ditanyakan lagi.",
+      "glossary": {"resi": "Nomor untuk melacak paket.", "eskalasi": "Masalah diteruskan ke atasan."},
+      "turns": [
+        {"speaker": "s1", "text": "Halo, dengan layanan pelanggan. Ada yang bisa dibantu?", "suggest": ["Paket saya belum sampai", "Saya mau komplain", "Jam buka sampai kapan?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Baik, boleh sebutkan nomor pesanannya?", "suggest": ["SWR-4821", "Sebentar saya cari", "Di mana lihatnya?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Paket Anda tertahan di gudang Bandung. Nomor resinya JX-77310.", "suggest": ["Kenapa tertahan?", "Kapan sampainya?", "Apa itu resi?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Alamatnya kurang lengkap, tidak ada nomor rumah.", "suggest": ["Nomor rumah saya 12", "Bisa saya ubah?", "Kenapa tidak dihubungi?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Saya panggil supervisor saya dulu untuk mengubah alamat.", "suggest": ["Baik, saya tunggu", "Berapa lama?", "Terima kasih"]},
+        {"waitForUser": true},
+        {"speaker": "s2", "text": "Halo, saya supervisornya. Alamatnya sudah saya ubah. Paket dikirim ulang besok pagi.", "suggest": ["Terima kasih", "Jam berapa sampainya?", "Ada biaya tambahan?"]},
+        {"waitForUser": true},
+        {"speaker": "s2", "text": "Untuk konfirmasi, tolong sebutkan lagi nomor resi yang tadi diberikan.", "suggest": ["JX-77310", "Saya lupa", "Bisa diulang?"]},
+        {"waitForUser": true},
+        {"speaker": "s2", "text": "Benar. Ada lagi yang bisa kami bantu?", "suggest": ["Tidak, terima kasih", "Bagaimana cara lacak paket?", "Minta nomor telepon CS"]},
+        {"waitForUser": true}
+      ]
+    },
+    "B": {
+      "instruction": "Tagihan internetmu bulan ini lebih mahal. Tanyakan ke CS. Nomor pelangganmu 7730-19. Ingat informasi yang diberikan CS, nanti akan ditanyakan lagi.",
+      "glossary": {"prorata": "Biaya dihitung sesuai jumlah hari pemakaian.", "eskalasi": "Masalah diteruskan ke atasan."},
+      "turns": [
+        {"speaker": "s1", "text": "Selamat sore, layanan pelanggan internet. Ada yang bisa dibantu?", "suggest": ["Tagihan saya lebih mahal", "Internet saya lambat", "Saya mau berhenti langganan"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Baik, boleh sebutkan nomor pelanggannya?", "suggest": ["7730-19", "Sebentar saya cari", "Di mana lihatnya?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Ada biaya tambahan tiga puluh lima ribu rupiah untuk upgrade kecepatan. Kode tiketnya TK-5502.", "suggest": ["Saya tidak pernah upgrade", "Kapan upgradenya?", "Apa itu kode tiket?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Tercatat upgrade tanggal sepuluh lewat aplikasi.", "suggest": ["Itu bukan saya", "Bisa dibatalkan?", "Kenapa tidak ada konfirmasi?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Saya panggil supervisor saya dulu untuk membatalkan.", "suggest": ["Baik, saya tunggu", "Berapa lama?", "Terima kasih"]},
+        {"waitForUser": true},
+        {"speaker": "s2", "text": "Halo, saya supervisornya. Upgrade sudah dibatalkan dan biaya dikembalikan bulan depan.", "suggest": ["Terima kasih", "Kapan tepatnya?", "Apakah ada bukti?"]},
+        {"waitForUser": true},
+        {"speaker": "s2", "text": "Untuk konfirmasi, tolong sebutkan lagi kode tiket yang tadi diberikan.", "suggest": ["TK-5502", "Saya lupa", "Bisa diulang?"]},
+        {"waitForUser": true},
+        {"speaker": "s2", "text": "Benar. Ada lagi yang bisa kami bantu?", "suggest": ["Tidak, terima kasih", "Bagaimana cara cek tagihan?", "Minta nomor telepon CS"]},
+        {"waitForUser": true}
+      ]
+    }
+  }
+}

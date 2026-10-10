@@ -1,0 +1,26 @@
+{
+  "id": "warung",
+  "title": "Beli barang di warung",
+  "complexity": "sederhana",
+  "speakers": {"s1": "Penjual"},
+  "forms": {
+    "A": {
+      "instruction": "Kamu di warung. Beli 2 bungkus mi instan, lalu tanyakan total harganya.",
+      "turns": [
+        {"speaker": "s1", "text": "Selamat siang, mau beli apa?", "suggest": ["Mi instan dua bungkus", "Ada air mineral?", "Lihat-lihat dulu"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Dua bungkus jadi enam ribu rupiah, ya.", "suggest": ["Ini uangnya", "Bisa bayar QRIS?", "Terima kasih"]},
+        {"waitForUser": true}
+      ]
+    },
+    "B": {
+      "instruction": "Kamu di warung. Beli 1 botol air mineral besar, lalu tanyakan total harganya.",
+      "turns": [
+        {"speaker": "s1", "text": "Sore, cari apa?", "suggest": ["Air mineral besar satu", "Ada roti?", "Lihat-lihat dulu"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Yang besar tujuh ribu rupiah.", "suggest": ["Ini uangnya", "Bisa bayar QRIS?", "Terima kasih"]},
+        {"waitForUser": true}
+      ]
+    }
+  }
+}
