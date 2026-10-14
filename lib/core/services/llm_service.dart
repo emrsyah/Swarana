@@ -54,6 +54,9 @@ class OpenRouterLlm implements LlmService {
             body: jsonEncode({
               'model': Env.openRouterModel,
               'temperature': temperature,
+              // Short, latency-sensitive tasks: keep thinking to a minimum.
+              'reasoning': {'effort': 'minimal'},
+              'max_tokens': 300,
               'messages': [
                 {'role': 'system', 'content': '$_role\n\n$task'},
                 {'role': 'user', 'content': input},
@@ -108,10 +111,11 @@ class OpenRouterLlm implements LlmService {
     String draft = '',
   }) async {
     final task = 'Tugas: beri tepat 3 balasan yang bisa diucapkan Teman Tuli '
-        'berikutnya dalam percakapan lisan ini.\n'
-        'Batasan: tiap balasan maksimal 8 kata, maksud berbeda-beda '
-        '(misalnya setuju, bertanya, menolak), satu balasan per baris, '
-        'tanpa nomor dan tanpa penjelasan.'
+        'berikutnya dalam percakapan lisan ini, ditulis sebagai Teman Tuli (orang pertama).\n'
+        'Batasan: tiap balasan maksimal 6 kata, maksud berbeda-beda '
+        '(misalnya menjawab, bertanya balik, minta diulang), jangan pakai tanda kurung '
+        'atau placeholder seperti [Nama], jangan mengarang nama orang, '
+        'satu balasan per baris, tanpa nomor dan tanpa penjelasan.'
         '${draft.isNotEmpty ? ' Lanjutkan atau perbaiki draf pengguna.' : ''}';
     final input = 'Percakapan:\n${_historyText(history, speakers)}'
         '${draft.isNotEmpty ? '\n\nDraf pengguna: $draft' : ''}';

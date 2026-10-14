@@ -63,7 +63,8 @@ class SuggestionsPanel extends StatelessWidget {
           // Capped height so long suggestions at large text never push the
           // composer off screen.
           _ => ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 150),
+              // Tall enough for 3 short chips on 2 rows without a cut-off row.
+              constraints: const BoxConstraints(maxHeight: 200),
               child: SingleChildScrollView(
                 child: Wrap(spacing: V5Space.sm, runSpacing: V5Space.sm, children: [
                   for (final s in items)
@@ -74,9 +75,11 @@ class SuggestionsPanel extends StatelessWidget {
                         onLongPress: () => onEdit(s),
                         style: OutlinedButton.styleFrom(
                           backgroundColor: V5Colors.surface,
-                          padding: const EdgeInsets.symmetric(horizontal: V5Space.lg, vertical: 10),
+                          minimumSize: const Size(0, 44),
+                          tapTargetSize: MaterialTapTargetSize.padded,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         ),
-                        child: Text(s, style: const TextStyle(fontSize: 15)),
+                        child: Text(s, style: const TextStyle(fontSize: 15, height: 1.25)),
                       ),
                     ),
                 ]),
