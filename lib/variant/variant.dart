@@ -32,6 +32,10 @@ abstract class AppHandle {
 
   static AppHandle of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppScope>()!.handle;
+
+  /// For event handlers and callbacks: reads without registering a dependency.
+  static AppHandle read(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<AppScope>()!.handle;
 }
 
 class AppScope extends InheritedWidget {

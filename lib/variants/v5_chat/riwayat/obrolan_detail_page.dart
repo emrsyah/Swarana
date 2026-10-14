@@ -30,7 +30,7 @@ class _ObrolanDetailPageState extends State<ObrolanDetailPage> {
       );
 
   Future<void> _simplify(ChatMessage m) async {
-    final s = Services.of(context);
+    final s = Services.read(context);
     try {
       m.simplified = await s.llm.simplify(m.text);
       await s.storage.saveChat(c);
@@ -46,12 +46,12 @@ class _ObrolanDetailPageState extends State<ObrolanDetailPage> {
     final n = await showTextDialog(context, title: 'Ganti nama pembicara', initial: sp.name);
     if (n == null || n.trim().isEmpty || !mounted) return;
     sp.name = n.trim();
-    await Services.of(context).storage.saveChat(c);
+    await Services.read(context).storage.saveChat(c);
     if (mounted) setState(() {});
   }
 
   void _menu(ChatMessage m) {
-    final s = Services.of(context);
+    final s = Services.read(context);
     showMessageMenu(context, message: m, onAction: (a) {
       switch (a) {
         case MessageAction.speak:
@@ -96,7 +96,7 @@ class _ObrolanDetailPageState extends State<ObrolanDetailPage> {
             showName: group && !m.isMe,
             textScale: scale,
             onMenu: () => _menu(m),
-            onSpeak: () => Services.of(context).tts.speak(m.id, m.text),
+            onSpeak: () => Services.read(context).tts.speak(m.id, m.text),
             onRename: () => _rename(_speaker(m.speakerId)),
             onSimplify: () => _simplify(m),
           ),

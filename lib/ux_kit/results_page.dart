@@ -43,7 +43,11 @@ class _ResultsPageState extends State<ResultsPage> {
     );
     if (ok != true) return;
     await widget.storage.deleteStudy(pid);
-    setState(() => _studies = _load());
+    if (!mounted) return;
+    // The closure must not return the Future (setState rejects it, and the
+    // page then never refreshed after a delete on device).
+    _studies = _load();
+    setState(() {});
   }
 
   @override

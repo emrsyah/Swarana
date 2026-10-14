@@ -18,7 +18,7 @@ class _ResearcherTriggerState extends State<ResearcherTrigger> {
   Timer? _hold;
 
   void _down(PointerDownEvent _) {
-    if (AppHandle.of(context).ux.inStudy) return;
+    if (AppHandle.read(context).ux.inStudy) return;
     _hold = Timer(const Duration(seconds: 2), () {
       if (mounted) Navigator.of(context).pushNamed('/researcher');
     });

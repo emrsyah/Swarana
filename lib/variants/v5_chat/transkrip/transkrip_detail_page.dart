@@ -56,8 +56,8 @@ class _TranskripDetailPageState extends State<TranskripDetailPage> {
   Future<void> _toggleSimple(bool simple) async {
     setState(() => _simple = simple);
     if (!simple || t.simplified != null) return;
-    final s = Services.of(context);
-    AppHandle.of(context).ux.track('simplify_used', {'context': 'transkrip'});
+    final s = Services.read(context);
+    AppHandle.read(context).ux.track('simplify_used', {'context': 'transkrip'});
     setState(() {
       _loadingSimple = true;
       _simpleFailed = false;
@@ -72,8 +72,8 @@ class _TranskripDetailPageState extends State<TranskripDetailPage> {
   }
 
   Future<void> _explain(String word) async {
-    final s = Services.of(context);
-    AppHandle.of(context).ux.track('explain_used', {'word': word});
+    final s = Services.read(context);
+    AppHandle.read(context).ux.track('explain_used', {'word': word});
     setState(() {
       _word = word;
       _answer = null;

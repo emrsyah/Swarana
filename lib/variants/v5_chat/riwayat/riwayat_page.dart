@@ -36,7 +36,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
   }
 
   void _reload() {
-    final st = Services.of(context).storage;
+    final st = Services.read(context).storage;
     final study = AppHandle.of(context).ux.inStudy;
     _data = Future.wait([st.chats(includeDemo: !study), st.transcripts()])
         .then((r) => (r[0] as List<ChatSession>, r[1] as List<TranscriptSession>));
@@ -60,7 +60,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
   }
 
   Future<void> _more({ChatSession? chat, TranscriptSession? tr}) async {
-    final st = Services.of(context).storage;
+    final st = Services.read(context).storage;
     final title = chat?.title ?? tr!.title;
     final a = await showModalBottomSheet<String>(
       context: context,

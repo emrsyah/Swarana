@@ -148,7 +148,7 @@ class _ResearcherPanelState extends State<ResearcherPanel> {
         Text('Picu peringatan (demo)', style: t.titleSmall),
         Wrap(spacing: 8, children: [
           for (final k in AlertKind.values)
-            ActionChip(label: Text(k.name), onPressed: () => Services.of(context).alerts.raise(k)),
+            ActionChip(label: Text(k.name), onPressed: () => Services.read(context).alerts.raise(k)),
         ]),
         const SizedBox(height: 16),
         OutlinedButton.icon(

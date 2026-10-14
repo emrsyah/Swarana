@@ -72,6 +72,10 @@ class Services {
 
   static Services of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<ServicesScope>()!.services;
+
+  /// For event handlers and callbacks: reads without registering a dependency.
+  static Services read(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<ServicesScope>()!.services;
 }
 
 class ServicesScope extends InheritedWidget {

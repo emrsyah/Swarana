@@ -90,8 +90,27 @@ class LiveSttService implements SttService {
     await _listen();
   }
 
+  /// In dictation mode one session (up to 60 s) returns ever-growing text,
+  /// so everything landed in one bubble on device. We cut it into utterances:
+  /// after [_utteranceGap] without new words the current part is finalized and
+  /// later words start a new message.
+  static const _utteranceGap = Duration(milliseconds: 1400);
+  int _committed = 0;
+  String _lastText = '';
+  Timer? _gap;
+
+  void _emitSegment(String full, {required bool isFinal, double confidence = -1}) {
+    if (full.length < _committed) _committed = 0; // engine rewrote earlier words
+    final seg = full.substring(_committed).trim();
+    if (seg.isEmpty || _events.isClosed) return;
+    _events.add(SttEvent(seg, isFinal: isFinal, speakerId: _speaker, confidence: confidence));
+    if (isFinal) _committed = full.length;
+  }
+
   Future<void> _listen() async {
     if (!_wanted || _stt.isListening) return;
+    _committed = 0;
+    _lastText = '';
     _status.value = SttStatus.listening;
     await _stt.listen(
       onResult: _onResult,
@@ -113,8 +132,16 @@ class LiveSttService implements SttService {
     final text = r.recognizedWords.trim();
     if (text.isEmpty || _events.isClosed) return;
     _busyBackoffMs = 300;
-    _events.add(SttEvent(text,
-        isFinal: r.finalResult, speakerId: _speaker, confidence: r.confidence));
+    _gap?.cancel();
+    _lastText = text;
+    if (r.finalResult) {
+      _emitSegment(text, isFinal: true, confidence: r.confidence);
+      return;
+    }
+    _emitSegment(text, isFinal: false);
+    if (_continuous) {
+      _gap = Timer(_utteranceGap, () => _emitSegment(_lastText, isFinal: true));
+    }
   }
 
   void _onStatus(String s) {
@@ -154,7 +181,7 @@ class LiveSttService implements SttService {
   @override
   Future<void> pause() async {
     _wanted = false;
-    _restart?.cancel();
+    _restart?.cancel(); _gap?.cancel();
     await _stt.stop();
     _level.value = 0;
     _status.value = SttStatus.paused;
@@ -163,7 +190,7 @@ class LiveSttService implements SttService {
   @override
   Future<void> stop() async {
     _wanted = false;
-    _restart?.cancel();
+    _restart?.cancel(); _gap?.cancel();
     await _stt.cancel();
     _level.value = 0;
     _status.value = SttStatus.idle;
@@ -181,7 +208,7 @@ class LiveSttService implements SttService {
   @override
   void dispose() {
     _wanted = false;
-    _restart?.cancel();
+    _restart?.cancel(); _gap?.cancel();
     _stt.cancel();
     _events.close();
   }

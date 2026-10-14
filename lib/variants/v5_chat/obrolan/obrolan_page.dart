@@ -1,3 +1,5 @@
+import 'dart:ui' show FlutterView;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -45,9 +47,15 @@ class _ObrolanPageState extends State<ObrolanPage> {
   bool _offerTypingNotice = false;
   int _lastCount = 0;
 
+  /// Captured here: looking it up from a listener (which can fire while the
+  /// page is being torn down) registers an inherited dependency on a
+  /// deactivating element and trips '_dependents.isEmpty' (seen on device).
+  FlutterView? _view;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _view = View.of(context);
     if (_c != null) return;
     final app = AppHandle.of(context);
     final c = ObrolanController(Services.of(context), app.ux, resume: widget.resume);
@@ -95,11 +103,12 @@ class _ObrolanPageState extends State<ObrolanPage> {
     _lastCount = c.messages.length;
     // Screen readers: announce each finished partner message once.
     final last = c.messages.where((m) => !m.isMe && !m.partial).lastOrNull;
-    if (last != null && last.id != _announced) {
+    final view = _view;
+    if (last != null && last.id != _announced && view != null) {
       _announced = last.id;
-      SemanticsService.sendAnnouncement(View.of(context), '${c.speaker(last.speakerId).name}: ${last.text}', TextDirection.ltr);
+      SemanticsService.sendAnnouncement(view, '${c.speaker(last.speakerId).name}: ${last.text}', TextDirection.ltr);
     }
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   @override
