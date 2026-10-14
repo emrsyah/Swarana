@@ -7,6 +7,7 @@ import '../../../core/models/session.dart';
 import '../../../core/services/alerts.dart';
 import '../../../core/services/services.dart';
 import '../../../core/services/stt_service.dart';
+import '../../../ux_kit/ux_controller.dart';
 import '../../../variant/variant.dart';
 import '../copy.dart';
 import '../design/tokens.dart';
@@ -55,7 +56,12 @@ class _ObrolanPageState extends State<ObrolanPage> {
     c.addListener(_onChange);
     _c = c;
     _lastCount = c.messages.length;
-    WidgetsBinding.instance.addPostFrameCallback((_) => c.startListening());
+    _ux = app.ux..addListener(_onStudyPhase);
+    // In a study, listen only while the task runs (not during briefing or
+    // questionnaires), so partner lines never play before "Mulai".
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!app.ux.inStudy || app.ux.isRunning) c.startListening();
+    });
     _scroll.addListener(() {
       final away = _scroll.hasClients && _scroll.offset > 120;
       if (away != _awayFromBottom) {
@@ -65,6 +71,20 @@ class _ObrolanPageState extends State<ObrolanPage> {
         });
       }
     });
+  }
+
+  UxController? _ux;
+  bool _wasRunning = false;
+
+  void _onStudyPhase() {
+    final ux = _ux!, c = _c!;
+    if (!ux.inStudy) return;
+    if (ux.isRunning && !_wasRunning) {
+      c.startListening();
+    } else if (!ux.isRunning && _wasRunning && c.sttStatus == SttStatus.listening) {
+      c.s.stt.pause();
+    }
+    _wasRunning = ux.isRunning;
   }
 
   String? _announced;
@@ -84,6 +104,7 @@ class _ObrolanPageState extends State<ObrolanPage> {
 
   @override
   void dispose() {
+    _ux?.removeListener(_onStudyPhase);
     _c?.removeListener(_onChange);
     _c?.dispose();
     _composer.dispose();
