@@ -54,8 +54,7 @@ class OpenRouterLlm implements LlmService {
             body: jsonEncode({
               'model': Env.openRouterModel,
               'temperature': temperature,
-              // Short, latency-sensitive tasks: keep thinking to a minimum.
-              'reasoning': {'effort': 'minimal'},
+              ..._speedOptions(Env.openRouterModel),
               'max_tokens': 300,
               'messages': [
                 {'role': 'system', 'content': '$_role\n\n$task'},
@@ -70,6 +69,21 @@ class OpenRouterLlm implements LlmService {
     if (res.statusCode != 200) throw LlmException('HTTP ${res.statusCode}');
     return parseContent(utf8.decode(res.bodyBytes));
   }
+
+  /// Short, latency-sensitive tasks: no or minimal "thinking", fastest host.
+  static Map<String, Object> _speedOptions(String model) => {
+        if (model.startsWith('google/gemini'))
+          'reasoning': {'effort': 'minimal'}
+        else
+          'reasoning': {'enabled': false},
+        if (model.startsWith('qwen/') || model.startsWith('openai/gpt-oss'))
+          'provider': {
+            'order': ['Cerebras', 'Groq'],
+            'allow_fallbacks': true,
+          }
+        else
+          'provider': {'sort': 'latency'},
+      };
 
   static String parseContent(String body) {
     final j = jsonDecode(body) as Map<String, dynamic>;
