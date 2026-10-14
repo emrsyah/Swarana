@@ -127,7 +127,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: V5Space.lg),
-          child: TextField(
+          child: TextField(onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(), 
             onChanged: (v) => setState(() => _q = v.trim()),
             decoration: const InputDecoration(hintText: 'Cari judul atau isi', prefixIcon: Icon(Icons.search)),
           ),

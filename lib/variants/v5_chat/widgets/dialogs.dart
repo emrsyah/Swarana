@@ -69,7 +69,7 @@ class _SaveDialogState extends State<_SaveDialog> {
     return AlertDialog(
       title: Text(widget.heading),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        TextField(
+        TextField(onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(), 
           controller: _title,
           autofocus: false,
           decoration: InputDecoration(
@@ -118,7 +118,7 @@ Future<String?> showTextDialog(
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
-      content: TextField(
+      content: TextField(onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(), 
         controller: c,
         autofocus: true,
         maxLines: maxLines,

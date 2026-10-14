@@ -114,7 +114,7 @@ class _ComposerState extends State<Composer> {
             icon: const Icon(Icons.grid_view_rounded, color: V5Colors.primary),
           ),
           Expanded(
-            child: TextField(
+            child: TextField(onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(), 
               controller: widget.controller,
               onChanged: _changed,
               minLines: 1,

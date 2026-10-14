@@ -77,7 +77,7 @@ class _ResearcherPanelState extends State<ResearcherPanel> {
           ),
         Text('Sesi uji A/B', style: t.titleLarge),
         const SizedBox(height: 12),
-        TextField(
+        TextField(onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(), 
           controller: _pid,
           decoration: const InputDecoration(labelText: 'ID partisipan', hintText: 'contoh: P03', border: OutlineInputBorder()),
           onChanged: (v) {
