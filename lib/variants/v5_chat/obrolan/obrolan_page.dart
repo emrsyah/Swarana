@@ -292,10 +292,16 @@ class _ObrolanPageState extends State<ObrolanPage> {
           ),
           if (_offerTypingNotice && !study)
             Padding(
-              padding: const EdgeInsets.only(top: V5Space.sm),
-              child: ActionChip(
-                avatar: const Icon(Icons.volume_up, size: 18, color: V5Colors.primary),
-                label: const Text('Beri tahu: "Mohon tunggu, saya sedang mengetik"'),
+              padding: const EdgeInsets.fromLTRB(V5Space.lg, V5Space.sm, V5Space.lg, 0),
+              // Full-width button so the phrase wraps (a chip clipped it on device).
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(minTouch),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  alignment: Alignment.centerLeft,
+                ),
+                icon: const Icon(Icons.volume_up, size: 18),
+                label: const Text('Beri tahu: "Mohon tunggu, saya sedang mengetik"', softWrap: true),
                 onPressed: () {
                   setState(() => _offerTypingNotice = false);
                   final m = ChatMessage(
