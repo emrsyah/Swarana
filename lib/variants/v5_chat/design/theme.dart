@@ -75,9 +75,12 @@ ThemeData buildV5Theme() {
     drawerTheme: const DrawerThemeData(backgroundColor: V5Colors.surface, surfaceTintColor: Colors.transparent),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(
-        selectedBackgroundColor: V5Colors.surface,
-        backgroundColor: const Color(0xFFF1F2F4),
-        side: const BorderSide(color: Colors.transparent),
+        // Selected segment must read as selected (on device the white-on-grey
+        // version looked like the unselected one).
+        selectedBackgroundColor: V5Colors.aiTint,
+        selectedForegroundColor: V5Colors.primary,
+        backgroundColor: V5Colors.surface,
+        side: const BorderSide(color: V5Colors.border),
         minimumSize: const Size(0, 44),
       ),
     ),

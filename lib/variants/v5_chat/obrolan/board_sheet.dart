@@ -61,10 +61,17 @@ class _BoardSheetState extends State<BoardSheet> {
             Text('Frasa cepat', style: t.titleSmall),
             const SizedBox(height: V5Space.sm),
             Wrap(spacing: V5Space.sm, runSpacing: V5Space.sm, children: [
+              // Buttons (not chips) so long phrases wrap instead of clipping.
               for (final p in quickPhrases)
-                ActionChip(
-                  avatar: const Icon(Icons.volume_up, size: 18, color: V5Colors.primary),
-                  label: Text(p),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: const BorderSide(color: V5Colors.border),
+                    foregroundColor: V5Colors.ink,
+                    alignment: Alignment.centerLeft,
+                  ),
+                  icon: const Icon(Icons.volume_up, size: 18, color: V5Colors.primary),
+                  label: Text(p, softWrap: true),
                   onPressed: () {
                     Navigator.pop(context);
                     widget.onQuickPhrase!(p);
