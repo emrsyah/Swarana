@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/services/alerts.dart';
 import '../core/services/services.dart';
+import '../ux_kit/simulated_data.dart';
 import '../ux_kit/ux_models.dart';
 import 'variant.dart';
 
@@ -154,6 +155,19 @@ class _ResearcherPanelState extends State<ResearcherPanel> {
           onPressed: () => Navigator.of(context).pushNamed('/results'),
           icon: const Icon(Icons.table_chart_outlined),
           label: const Text('Lihat hasil uji'),
+        ),
+        const SizedBox(height: 8),
+        // Loads the report's simulated dataset (P1–P5), clearly labelled as
+        // simulated on the results page. Overwrites earlier P1–P5 records.
+        TextButton.icon(
+          onPressed: () async {
+            for (final s in simulatedStudies()) {
+              await app.storage.saveStudy((s['config'] as Map)['participant'] as String, s);
+            }
+            if (context.mounted) Navigator.of(context).pushNamed('/results');
+          },
+          icon: const Icon(Icons.science_outlined),
+          label: const Text('Muat data simulasi laporan (P1–P5)'),
         ),
       ]),
     );

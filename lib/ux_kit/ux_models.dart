@@ -79,6 +79,8 @@ class TaskResult {
     required this.waited,
     this.block = 0,
     this.position = 0,
+    this.okInteractions,
+    this.totalInteractions,
     required this.path,
     required this.taps,
     required this.rageClicks,
@@ -100,6 +102,11 @@ class TaskResult {
   /// 0 = first variant block; position within the block (order effects).
   final int block;
   final int position;
+
+  /// Optional per-interaction success (researcher-coded): how many of the
+  /// scenario's interactions got the message across without help.
+  final int? okInteractions;
+  final int? totalInteractions;
   final List<String> path;
   final int taps;
   final int rageClicks;
@@ -120,6 +127,8 @@ class TaskResult {
         'waited_ms': waited.inMilliseconds,
         'block_index': block,
         'task_position': position,
+        if (okInteractions != null) 'ok_interactions': okInteractions,
+        if (totalInteractions != null) 'total_interactions': totalInteractions,
         'path': path,
         'taps': taps,
         'rage_clicks': rageClicks,
@@ -138,6 +147,8 @@ class TaskResult {
         waited: Duration(milliseconds: (j['waited_ms'] as num?)?.toInt() ?? 0),
         block: (j['block_index'] as num?)?.toInt() ?? 0,
         position: (j['task_position'] as num?)?.toInt() ?? 0,
+        okInteractions: (j['ok_interactions'] as num?)?.toInt(),
+        totalInteractions: (j['total_interactions'] as num?)?.toInt(),
         path: (j['path'] as List).cast<String>(),
         taps: (j['taps'] as num).toInt(),
         rageClicks: (j['rage_clicks'] as num).toInt(),

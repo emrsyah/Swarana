@@ -62,6 +62,20 @@ class _ResultsPageState extends State<ResultsPage> {
             return const Center(child: Text('Belum ada data uji.'));
           }
           return ListView(padding: const EdgeInsets.all(16), children: [
+            if (studies.any((s) => s.simulated))
+              Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E6),
+                  border: Border.all(color: const Color(0xFFF5C451)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Data simulasi: sebagian atau semua data di halaman ini bukan hasil sesi uji yang direkam.',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
             _Summary(studies: studies),
             const SizedBox(height: 24),
             for (final s in studies) _ParticipantCard(study: s, onDelete: () => _delete(s.participant)),
@@ -73,12 +87,14 @@ class _ResultsPageState extends State<ResultsPage> {
 }
 
 class _Study {
-  _Study(this.participant, this.order, this.finished, this.blocks);
+  _Study(this.participant, this.order, this.finished, this.blocks, {this.simulated = false, this.status});
 
   final String participant;
   final List<AppVariant> order;
   final bool finished;
   final List<VariantBlock> blocks;
+  final bool simulated;
+  final String? status;
 
   factory _Study.fromJson(Map<String, Object?> j) {
     final cfg = StudyConfig.fromJson((j['config'] as Map).cast());
@@ -87,13 +103,28 @@ class _Study {
       cfg.order,
       j['finished'] == true,
       (j['blocks'] as List).map((e) => VariantBlock.fromJson((e as Map).cast())).toList(),
+      simulated: j['simulated'] == true,
+      status: j['participant_status'] as String?,
     );
   }
 
   VariantBlock? block(AppVariant v) => blocks.where((b) => b.variant == v).firstOrNull;
 }
 
-double? _mean(Iterable<num> xs) => xs.isEmpty ? null : xs.reduce((a, b) => a + b) / xs.length;
+// fold, not reduce: an Iterable<int> passed as Iterable<num> makes reduce's
+// (num, num) => num callback fail its runtime type check (red screen on device).
+double? _mean(Iterable<num> xs) => xs.isEmpty ? null : xs.fold<double>(0, (a, b) => a + b) / xs.length;
+/// Per interaction when coded (ok / total interactions), else per task.
+double? _successRate(Iterable<TaskResult> rs) {
+  final coded = rs.where((r) => r.totalInteractions != null).toList();
+  if (coded.isNotEmpty) {
+    final ok = coded.fold<int>(0, (a, r) => a + r.okInteractions!);
+    final total = coded.fold<int>(0, (a, r) => a + r.totalInteractions!);
+    return total == 0 ? null : ok * 100 / total;
+  }
+  return _mean(rs.map((r) => r.outcome.isSuccess ? 100 : 0));
+}
+
 String _f(double? v, [int digits = 0]) => v == null ? '–' : v.toStringAsFixed(digits);
 String _diff(double? a, double? b) {
   if (a == null || b == null || a == 0) return '–';
@@ -124,8 +155,12 @@ class _Summary extends StatelessWidget {
         row('Waktu: $sc (detik)', _mean(tasks(v3, sc).map((r) => r.duration.inMilliseconds / 1000)),
             _mean(tasks(v5, sc).map((r) => r.duration.inMilliseconds / 1000))),
       for (final sc in scenarioIds)
-        row('Success rate: $sc (%)', _mean(tasks(v3, sc).map((r) => r.outcome.isSuccess ? 100 : 0)),
-            _mean(tasks(v5, sc).map((r) => r.outcome.isSuccess ? 100 : 0))),
+        () {
+          final a = _successRate(tasks(v3, sc)), b = _successRate(tasks(v5, sc));
+          // Success difference in percentage points, as in the report.
+          final pp = a == null || b == null ? '–' : '${b - a >= 0 ? '+' : ''}${(b - a).toStringAsFixed(0)} pp';
+          return ['Success rate: $sc (%)', _f(a), _f(b), pp];
+        }(),
       row('SEQ (1–7)', _mean(tasks(v3).map((r) => r.seq ?? 0).where((e) => e > 0)),
           _mean(tasks(v5).map((r) => r.seq ?? 0).where((e) => e > 0)), digits: 1),
       row('SUS', _mean(studies.map((s) => s.block(v3)?.sus).whereType<double>()),
@@ -226,7 +261,11 @@ class _ParticipantCard extends StatelessWidget {
     final t = Theme.of(context).textTheme;
     return Card(
       child: ExpansionTile(
-        title: Text(study.participant),
+        title: Text([
+          study.participant,
+          if (study.status != null) study.status!,
+          if (study.simulated) 'simulasi',
+        ].join(' · ')),
         subtitle: Text('${study.order.map((v) => v == AppVariant.v3Board ? 'v3' : 'v5').join(' → ')}'
             '${study.finished ? '' : ' · belum selesai'}'),
         trailing: IconButton(tooltip: 'Hapus', onPressed: onDelete, icon: const Icon(Icons.delete_outline)),
