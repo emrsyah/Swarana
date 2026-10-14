@@ -109,6 +109,14 @@ class ObrolanController extends ChangeNotifier {
   String _partnerId(String raw) => s.settings.separateSpeakers.value ? raw : 's1';
 
   void _onStt(SttEvent e) {
+    // Drop the phone hearing its own text-to-speech.
+    if (s.scripted == null && s.tts.isEcho(e.text)) {
+      final sid = _partnerId(e.speakerId);
+      final p = _partial.remove(sid);
+      if (p != null) session.messages.remove(p);
+      notifyListeners();
+      return;
+    }
     final sid = _partnerId(e.speakerId);
     speaker(sid); // registers new speakers
     final existing = _partial[sid];

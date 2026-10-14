@@ -39,6 +39,20 @@ class TtsService {
   }
 
   bool _resumeContinuous = true;
+
+  /// Text and time of the last utterance, so listeners can drop echoes.
+  String? lastSpokenText;
+  DateTime? lastSpokenAt;
+
+  /// True if [heard] looks like the phone's own last utterance.
+  bool isEcho(String heard) {
+    final at = lastSpokenAt, said = lastSpokenText;
+    if (at == null || said == null) return false;
+    if (DateTime.now().difference(at) > const Duration(seconds: 4)) return false;
+    String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^\w\s]'), '').trim();
+    final h = norm(heard), s = norm(said);
+    return h.isNotEmpty && (s.contains(h) || h.contains(s));
+  }
   bool _disposed = false;
 
   void _emit(TtsState s) {
@@ -50,10 +64,15 @@ class TtsService {
     _emit(s);
     if (s == TtsState.done && !_disposed) haptics.done();
     _current = null;
+    lastSpokenAt = DateTime.now();
     if (_resumeStt && !_disposed) {
       _resumeStt = false;
-      // Resume in the mode it was in (v3 single-shot, v5 continuous).
-      stt?.start(continuous: _resumeContinuous);
+      // Resume in the mode it was in (v3 single-shot, v5 continuous), after
+      // the speaker's tail has died down (on device the app heard itself).
+      final continuous = _resumeContinuous;
+      Future<void>.delayed(const Duration(milliseconds: 600), () {
+        if (!_disposed) stt?.start(continuous: continuous);
+      });
     }
   }
 
@@ -78,6 +97,8 @@ class TtsService {
       await s.pause();
     }
     _current = id;
+    lastSpokenText = text;
+    lastSpokenAt = DateTime.now();
     _updates.add((id: id, state: TtsState.speaking));
     final r = await _tts.speak(text);
     if (r != 1) _finish(TtsState.failed);
