@@ -12,7 +12,8 @@ const _v3Board = <_Spot>[
   (x: 0.15, y: 0.25, weight: 2), (x: 0.40, y: 0.25, weight: 2), (x: 0.72, y: 0.25, weight: 1), // categories
   (x: 0.30, y: 0.33, weight: 2), (x: 0.70, y: 0.33, weight: 2), // Kata / Kalimat
   (x: 0.19, y: 0.45, weight: 3), (x: 0.40, y: 0.45, weight: 3), (x: 0.60, y: 0.45, weight: 2), (x: 0.81, y: 0.45, weight: 2),
-  (x: 0.19, y: 0.60, weight: 2), (x: 0.40, y: 0.60, weight: 2), (x: 0.60, y: 0.60, weight: 1), (x: 0.81, y: 0.60, weight: 1),
+  (x: 0.19, y: 0.605, weight: 2), (x: 0.40, y: 0.605, weight: 2), (x: 0.60, y: 0.605, weight: 1), (x: 0.81, y: 0.605, weight: 1),
+  (x: 0.19, y: 0.76, weight: 1), (x: 0.40, y: 0.76, weight: 1), (x: 0.60, y: 0.76, weight: 1), (x: 0.81, y: 0.76, weight: 2),
   (x: 0.50, y: 0.90, weight: 6), // Dengar mic
 ];
 const _v3Dengar = <_Spot>[
@@ -22,12 +23,12 @@ const _v3Dengar = <_Spot>[
   (x: 0.88, y: 0.10, weight: 3), // close
 ];
 const _v5Obrolan = <_Spot>[
-  (x: 0.48, y: 0.94, weight: 6), // composer
+  (x: 0.42, y: 0.94, weight: 6), // composer
   (x: 0.90, y: 0.94, weight: 6), // send
-  (x: 0.27, y: 0.80, weight: 4), (x: 0.68, y: 0.80, weight: 3), (x: 0.20, y: 0.86, weight: 2), // suggestions
+  (x: 0.46, y: 0.733, weight: 4), (x: 0.42, y: 0.80, weight: 3), (x: 0.45, y: 0.87, weight: 2), // suggestions
   (x: 0.08, y: 0.94, weight: 1), // board button
-  (x: 0.84, y: 0.15, weight: 1), // Jeda
-  (x: 0.50, y: 0.60, weight: 1), // scroll / read history
+  (x: 0.79, y: 0.147, weight: 1), // Jeda / Lanjutkan
+  (x: 0.38, y: 0.55, weight: 1), // partner bubble (long-press menu)
 ];
 
 /// SIMULATED tap and rage-click events for P1–P5 (heatmap). Each event

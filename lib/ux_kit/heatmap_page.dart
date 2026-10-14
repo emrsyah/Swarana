@@ -17,6 +17,13 @@ class _HeatmapPageState extends State<HeatmapPage> {
   String _variant = 'v3Board';
   String? _screen;
 
+  /// Device screenshots used as the background for each tracked screen.
+  static const _shots = {
+    '/v3/board': 'assets/heatmap/v3_board.png',
+    '/v3/dengar': 'assets/heatmap/v3_dengar.png',
+    '/v5/obrolan': 'assets/heatmap/v5_obrolan.png',
+  };
+
   static const _screenNames = {
     '/v3/board': 'v3 · Papan bicara',
     '/v3/dengar': 'v3 · Mode dengar',
@@ -89,30 +96,40 @@ class _HeatmapPageState extends State<HeatmapPage> {
                   aspectRatio: 1080 / 2340,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF4F5F8),
-                        border: Border.all(color: const Color(0xFFD5D8E0), width: 2),
-                        borderRadius: BorderRadius.circular(24),
+                    child: Stack(fit: StackFit.expand, children: [
+                      // The real screen (screenshot from the device), slightly
+                      // faded so the heat reads clearly on top.
+                      if (_shots[screen] != null)
+                        Opacity(opacity: 0.85, child: Image.asset(_shots[screen]!, fit: BoxFit.fill))
+                      else
+                        const ColoredBox(color: Color(0xFFF4F5F8)),
+                      CustomPaint(painter: _HeatPainter(taps: taps, rage: rage)),
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: const Color(0xFFD5D8E0), width: 2),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
                       ),
-                      child: CustomPaint(painter: _HeatPainter(taps: taps, rage: rage, screen: screen!)),
-                    ),
+                    ]),
                   ),
                 ),
                 ),
               ),
               const SizedBox(height: 12),
-              Row(children: [
-                Container(width: 120, height: 10, decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [Color(0x330072B2), Color(0xFFE69F00), Color(0xFFD55E00)]),
-                )),
-                const SizedBox(width: 8),
-                const Text('sedikit → banyak ketukan'),
-                const SizedBox(width: 16),
-                Container(width: 14, height: 14, decoration: BoxDecoration(
-                  shape: BoxShape.circle, border: Border.all(color: const Color(0xFFDC2626), width: 2))),
-                const SizedBox(width: 6),
-                const Text('rage click'),
+              Wrap(spacing: 16, runSpacing: 8, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 80, height: 10, decoration: const BoxDecoration(
+                    gradient: LinearGradient(colors: [Color(0x330072B2), Color(0xFFE69F00), Color(0xFFD55E00)]),
+                  )),
+                  const SizedBox(width: 8),
+                  const Text('sedikit → banyak ketukan'),
+                ]),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 14, height: 14, decoration: BoxDecoration(
+                    shape: BoxShape.circle, border: Border.all(color: const Color(0xFFDC2626), width: 2))),
+                  const SizedBox(width: 6),
+                  const Text('rage click'),
+                ]),
               ]),
             ],
           ]);
@@ -123,53 +140,12 @@ class _HeatmapPageState extends State<HeatmapPage> {
 }
 
 class _HeatPainter extends CustomPainter {
-  _HeatPainter({required this.taps, required this.rage, required this.screen});
+  _HeatPainter({required this.taps, required this.rage});
   final List<Map<String, Object?>> taps;
   final List<Map<String, Object?>> rage;
-  final String screen;
-
-  /// Faint wireframe of the screen so taps have context.
-  void _wire(Canvas c, Size s) {
-    final p = Paint()
-      ..color = const Color(0xFFCBD0DA)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5;
-    RRect r(double x, double y, double w, double h, [double rad = 10]) =>
-        RRect.fromLTRBR(x * s.width, y * s.height, (x + w) * s.width, (y + h) * s.height, Radius.circular(rad));
-    c.drawLine(Offset(0, s.height * 0.07), Offset(s.width, s.height * 0.07), p);
-    switch (screen) {
-      case '/v3/board':
-        c.drawRRect(r(0.05, 0.14, 0.90, 0.06), p);
-        for (final x in [0.05, 0.30, 0.56]) {
-          c.drawRRect(r(x, 0.23, 0.22, 0.04, 20), p);
-        }
-        c.drawRRect(r(0.07, 0.31, 0.86, 0.04, 20), p);
-        for (final y in [0.38, 0.53, 0.68]) {
-          for (final x in [0.08, 0.30, 0.51, 0.72]) {
-            c.drawRRect(r(x, y, 0.19, 0.13), p);
-          }
-        }
-        c.drawCircle(Offset(s.width * 0.5, s.height * 0.90), s.width * 0.07, p);
-      case '/v3/dengar':
-        c.drawRRect(r(0.05, 0.30, 0.90, 0.30, 16), p);
-        for (final (x, y) in [(0.10, 0.33), (0.52, 0.33), (0.10, 0.47)]) {
-          c.drawRRect(r(x, y, 0.38, 0.11), p);
-        }
-        c.drawCircle(Offset(s.width * 0.5, s.height * 0.81), s.width * 0.09, p);
-      default:
-        c.drawRRect(r(0.70, 0.12, 0.26, 0.05, 20), p);
-        c.drawRRect(r(0.50, 0.40, 0.45, 0.08, 14), p);
-        c.drawRRect(r(0.15, 0.52, 0.55, 0.09, 14), p);
-        c.drawRRect(r(0.04, 0.77, 0.45, 0.05, 20), p);
-        c.drawRRect(r(0.52, 0.77, 0.34, 0.05, 20), p);
-        c.drawRRect(r(0.15, 0.91, 0.66, 0.06, 30), p);
-        c.drawCircle(Offset(s.width * 0.90, s.height * 0.94), s.width * 0.06, p);
-    }
-  }
 
   @override
   void paint(Canvas canvas, Size size) {
-    _wire(canvas, size);
     final radius = size.width * 0.09;
     // Additive blobs: overlapping taps build up heat.
     canvas.saveLayer(Offset.zero & size, Paint());
@@ -179,7 +155,7 @@ class _HeatPainter extends CustomPainter {
         o,
         radius,
         Paint()
-          ..shader = RadialGradient(colors: const [Color(0x40D55E00), Color(0x22E69F00), Color(0x000072B2)])
+          ..shader = RadialGradient(colors: const [Color(0x70E5482B), Color(0x40F2A33A), Color(0x00F2A33A)])
               .createShader(Rect.fromCircle(center: o, radius: radius)),
       );
     }
@@ -198,5 +174,5 @@ class _HeatPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_HeatPainter old) => old.taps != taps || old.rage != rage || old.screen != screen;
+  bool shouldRepaint(_HeatPainter old) => old.taps != taps || old.rage != rage;
 }
