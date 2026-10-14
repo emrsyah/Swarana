@@ -164,6 +164,9 @@ class _ResearcherPanelState extends State<ResearcherPanel> {
             for (final s in simulatedStudies()) {
               await app.storage.saveStudy((s['config'] as Map)['participant'] as String, s);
             }
+            for (final e in simulatedEvents().entries) {
+              await app.storage.writeEvents(e.key, e.value);
+            }
             if (context.mounted) Navigator.of(context).pushNamed('/results');
           },
           icon: const Icon(Icons.science_outlined),

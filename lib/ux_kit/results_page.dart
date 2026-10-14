@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../core/models/app_variant.dart';
 import '../core/services/storage.dart';
+import 'heatmap_page.dart';
 import 'ux_models.dart';
 
 /// Researcher dashboard: per participant results and the v3 vs v5 summary
@@ -55,7 +56,17 @@ class _ResultsPageState extends State<ResultsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Hasil uji'),
-        actions: [IconButton(tooltip: 'Ekspor JSON', onPressed: _export, icon: const Icon(Icons.ios_share))],
+        actions: [
+          IconButton(
+            tooltip: 'Heatmap ketukan',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              settings: const RouteSettings(name: '/results/heatmap'),
+              builder: (_) => HeatmapPage(storage: widget.storage),
+            )),
+            icon: const Icon(Icons.blur_on),
+          ),
+          IconButton(tooltip: 'Ekspor JSON', onPressed: _export, icon: const Icon(Icons.ios_share)),
+        ],
       ),
       body: FutureBuilder<List<_Study>>(
         future: _studies,

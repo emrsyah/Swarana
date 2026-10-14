@@ -108,6 +108,27 @@ class Storage {
     return out;
   }
 
+  /// Every raw tracking event of every participant (for the heatmap).
+  Future<List<Map<String, Object?>>> allEvents() async {
+    final out = <Map<String, Object?>>[];
+    for (final f in _study.listSync().whereType<File>()) {
+      if (!f.path.endsWith('.events.jsonl')) continue;
+      for (final line in await f.readAsLines()) {
+        if (line.trim().isEmpty) continue;
+        try {
+          out.add((jsonDecode(line) as Map).cast());
+        } on FormatException {
+          // skip a half-written line
+        }
+      }
+    }
+    return out;
+  }
+
+  /// Replaces a participant's event log (used by the simulated dataset).
+  Future<void> writeEvents(String participantId, List<Map<String, Object?>> events) => _serial(() =>
+      _atomic(File('${_study.path}/$participantId.events.jsonl'), events.map(jsonEncode).join('\n')));
+
   Future<void> deleteStudy(String participantId) async {
     for (final ext in ['json', 'events.jsonl']) {
       final f = File('${_study.path}/$participantId.$ext');

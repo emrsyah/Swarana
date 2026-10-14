@@ -1,4 +1,97 @@
+import 'dart:math';
+
 import 'questionnaires.dart';
+
+/// Hotspots (normalised 0–1 screen coordinates, measured from device
+/// screenshots) and how often each is tapped per task.
+typedef _Spot = ({double x, double y, int weight});
+
+const _v3Board = <_Spot>[
+  (x: 0.50, y: 0.17, weight: 4), // text field
+  (x: 0.88, y: 0.17, weight: 5), // speak icon
+  (x: 0.15, y: 0.25, weight: 2), (x: 0.40, y: 0.25, weight: 2), (x: 0.72, y: 0.25, weight: 1), // categories
+  (x: 0.30, y: 0.33, weight: 2), (x: 0.70, y: 0.33, weight: 2), // Kata / Kalimat
+  (x: 0.19, y: 0.45, weight: 3), (x: 0.40, y: 0.45, weight: 3), (x: 0.60, y: 0.45, weight: 2), (x: 0.81, y: 0.45, weight: 2),
+  (x: 0.19, y: 0.60, weight: 2), (x: 0.40, y: 0.60, weight: 2), (x: 0.60, y: 0.60, weight: 1), (x: 0.81, y: 0.60, weight: 1),
+  (x: 0.50, y: 0.90, weight: 6), // Dengar mic
+];
+const _v3Dengar = <_Spot>[
+  (x: 0.29, y: 0.38, weight: 4), (x: 0.71, y: 0.38, weight: 3), (x: 0.29, y: 0.52, weight: 2), // suggestion cards
+  (x: 0.88, y: 0.17, weight: 2), // keyboard toggle
+  (x: 0.50, y: 0.81, weight: 5), // mic again
+  (x: 0.88, y: 0.10, weight: 3), // close
+];
+const _v5Obrolan = <_Spot>[
+  (x: 0.48, y: 0.94, weight: 6), // composer
+  (x: 0.90, y: 0.94, weight: 6), // send
+  (x: 0.27, y: 0.80, weight: 4), (x: 0.68, y: 0.80, weight: 3), (x: 0.20, y: 0.86, weight: 2), // suggestions
+  (x: 0.08, y: 0.94, weight: 1), // board button
+  (x: 0.84, y: 0.15, weight: 1), // Jeda
+  (x: 0.50, y: 0.60, weight: 1), // scroll / read history
+];
+
+/// SIMULATED tap and rage-click events for P1–P5 (heatmap). Each event
+/// carries `simulated: true`.
+Map<String, List<Map<String, Object?>>> simulatedEvents() {
+  final rnd = Random(42);
+  const scenarios = ['warung', 'bank', 'cs'];
+  const interactions = {'warung': 2, 'bank': 5, 'cs': 9};
+  const orderV3First = {'P1': true, 'P2': false, 'P3': true, 'P4': false, 'P5': true};
+  final start = DateTime(2026, 9, 22, 9);
+  final out = <String, List<Map<String, Object?>>>{};
+
+  _Spot pick(List<_Spot> spots) {
+    final total = spots.fold<int>(0, (a, s) => a + s.weight);
+    var r = rnd.nextInt(total);
+    for (final s in spots) {
+      if ((r -= s.weight) < 0) return s;
+    }
+    return spots.last;
+  }
+
+  double jitter(double v) => (v + (rnd.nextDouble() - 0.5) * 0.06).clamp(0.01, 0.99);
+
+  var day = 0;
+  orderV3First.forEach((pid, v3First) {
+    final events = <Map<String, Object?>>[];
+    var t = start.add(Duration(days: day++));
+    for (final variant in v3First ? ['v3Board', 'v5Chat'] : ['v5Chat', 'v3Board']) {
+      final v3 = variant == 'v3Board';
+      for (final sc in scenarios) {
+        // v3 needs ~3.2 taps per interaction (board hunting, mode switching),
+        // v5 ~1.8 (type/suggest + send).
+        final n = (interactions[sc]! * (v3 ? 3.2 : 1.8) + rnd.nextInt(4)).round();
+        for (var i = 0; i < n; i++) {
+          final dengar = v3 && rnd.nextDouble() < 0.35;
+          final screen = v3 ? (dengar ? '/v3/dengar' : '/v3/board') : '/v5/obrolan';
+          final s = pick(v3 ? (dengar ? _v3Dengar : _v3Board) : _v5Obrolan);
+          t = t.add(Duration(milliseconds: 1500 + rnd.nextInt(4000)));
+          final e = {
+            'event': 'ux_tap',
+            'at': t.toIso8601String(),
+            'participant': pid,
+            'variant': variant,
+            'scenario': sc,
+            'in_task': true,
+            'simulated': true,
+            'x': jitter(s.x),
+            'y': jitter(s.y),
+            'screen': screen,
+          };
+          events.add(e);
+          // Occasional rage clicks: v3 on the speak icon / Dengar mic.
+          if (v3 && (s.y > 0.85 || s.x > 0.85) && rnd.nextDouble() < 0.18) {
+            events.add({...e, 'event': 'ux_rage_click'});
+          } else if (!v3 && s.x > 0.85 && s.y > 0.9 && rnd.nextDouble() < 0.04) {
+            events.add({...e, 'event': 'ux_rage_click'});
+          }
+        }
+      }
+    }
+    out[pid] = events;
+  });
+  return out;
+}
 
 /// SIMULATED study data for the report ("Penjabaran Skor Iterasi 5", file
 /// marked "simulasi"). Every record carries `simulated: true` and the results
