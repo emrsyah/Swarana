@@ -40,21 +40,23 @@ class HeaderStatus extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.fromLTRB(V5Space.xl, V5Space.md, V5Space.lg, V5Space.md),
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: V5Colors.border))),
-          child: Row(children: [
-            Expanded(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ResearcherTrigger(child: Text(title, style: t.titleLarge)),
-                const SizedBox(height: 6),
-                _StatusRow(status: status, level: level),
-              ]),
-            ),
-            if (onTogglePause != null && status != SttStatus.unavailable)
-              _PauseButton(listening: status == SttStatus.listening, onTap: onTogglePause!),
-            ...actions,
-            if (onMenu != null) ...[
-              const SizedBox(width: V5Space.sm),
-              _RoundIconButton(icon: Icons.menu, tooltip: 'Menu', onTap: onMenu!),
-            ],
+          // Title + actions on top; status + Jeda on their own full-width row
+          // so the status is never truncated on narrow phones (seen on device).
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(child: ResearcherTrigger(child: Text(title, style: t.titleLarge))),
+              ...actions,
+              if (onMenu != null) ...[
+                const SizedBox(width: V5Space.sm),
+                _RoundIconButton(icon: Icons.menu, tooltip: 'Menu', onTap: onMenu!),
+              ],
+            ]),
+            const SizedBox(height: V5Space.xs),
+            Row(children: [
+              Expanded(child: _StatusRow(status: status, level: level)),
+              if (onTogglePause != null && status != SttStatus.unavailable)
+                _PauseButton(listening: status == SttStatus.listening, onTap: onTogglePause!),
+            ]),
           ]),
         ),
       ),
