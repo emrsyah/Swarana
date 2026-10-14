@@ -81,8 +81,11 @@ class _HeatmapPageState extends State<HeatmapPage> {
                   '${simulated ? ' · data simulasi' : ''}',
                   style: t.bodyMedium),
               const SizedBox(height: 12),
+              // Sized so the whole phone screen fits without scrolling.
               Center(
-                child: AspectRatio(
+                child: SizedBox(
+                  height: MediaQuery.sizeOf(context).height * 0.58,
+                  child: AspectRatio(
                   aspectRatio: 1080 / 2340,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
@@ -95,6 +98,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
                       child: CustomPaint(painter: _HeatPainter(taps: taps, rage: rage, screen: screen!)),
                     ),
                   ),
+                ),
                 ),
               ),
               const SizedBox(height: 12),
