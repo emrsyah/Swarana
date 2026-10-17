@@ -39,6 +39,7 @@ class _HeatmapPageState extends State<HeatmapPage> {
     ('opsi1', 'Iter4 Opsi 1'),
     ('opsi2', 'Iter4 Opsi 2'),
     ('opsi3', 'Iter4 Opsi 3'),
+    ('iter6', 'Iter6 Uji 4'),
   ];
 
   @override

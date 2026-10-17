@@ -4,6 +4,7 @@ import '../core/services/alerts.dart';
 import '../core/services/services.dart';
 import '../iter4/iter4_results_page.dart';
 import '../iter4/iter4_session_page.dart';
+import '../iter6/iter6_setup_page.dart';
 import '../ux_kit/simulated_data.dart';
 import '../ux_kit/ux_models.dart';
 import 'variant.dart';
@@ -159,6 +160,19 @@ class _ResearcherPanelState extends State<ResearcherPanel> {
           ),
         ]),
         Text('Isi ID partisipan di atas dulu.', style: t.bodySmall),
+        const Divider(height: 40),
+        Text('Uji 4 · Iterasi 6 (role-play bank)', style: t.titleLarge),
+        const SizedBox(height: 4),
+        Text('Antarmuka Iterasi 5. Teller manusia atau simulasi; penilaian evaluator setelah selesai.', style: t.bodySmall),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+            settings: const RouteSettings(name: '/iter6'),
+            builder: (_) => const Iter6SetupPage(),
+          )),
+          icon: const Icon(Icons.account_balance_outlined),
+          label: const Text('Buka Uji 4 Iterasi 6'),
+        ),
         const Divider(height: 40),
         Text('Mode bebas', style: t.titleLarge),
         const SizedBox(height: 8),
