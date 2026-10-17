@@ -20,14 +20,45 @@ enum I4Option {
 }
 
 enum I4Task {
-  reply('T1', 'Balas', 'Pesan nasi goreng yang tidak pedas ke kasir.'),
-  repeat('T2', 'Minta ulang', 'Ucapan kasir tidak jelas. Minta kasir mengulang ucapannya.'),
-  recall('T3', 'Ingat', 'Berapa total harga yang tadi disebut kasir? Cari di aplikasi, lalu sebutkan ke peneliti.');
+  reply('T1', 'Balas'),
+  repeat('T2', 'Minta ulang'),
+  recall('T3', 'Ingat');
 
-  const I4Task(this.id, this.title, this.instruction);
+  const I4Task(this.id, this.title);
   final String id;
   final String title;
-  final String instruction;
+}
+
+/// Content set per option position, so later options don't benefit from
+/// already knowing the order or the total (practice effect).
+class I4Content {
+  const I4Content({
+    required this.order,
+    required this.dish,
+    required this.modifier,
+    required this.total,
+    required this.totalDigits,
+    required this.drink,
+  });
+
+  /// What the participant must order, as shown in the briefing.
+  final String order;
+  final String dish;
+
+  /// The ingredient that must be negated ("pedas", "sambal"...).
+  final String modifier;
+  final String total;
+  final String totalDigits;
+  final String drink;
+
+  static const sets = [
+    I4Content(order: 'nasi goreng yang tidak pedas', dish: 'nasi goreng', modifier: 'pedas',
+        total: 'dua puluh lima ribu', totalDigits: 'Rp25.000', drink: 'es teh atau air putih'),
+    I4Content(order: 'mie ayam tanpa sambal', dish: 'mie ayam', modifier: 'sambal',
+        total: 'delapan belas ribu', totalDigits: 'Rp18.000', drink: 'teh hangat atau jeruk'),
+    I4Content(order: 'bakso tanpa seledri', dish: 'bakso', modifier: 'seledri',
+        total: 'tiga puluh dua ribu', totalDigits: 'Rp32.000', drink: 'es jeruk atau air mineral'),
+  ];
 }
 
 enum I4Phase { brief, running, mark, between, done }
@@ -44,11 +75,12 @@ class I4Message {
 }
 
 class I4TaskResult {
-  I4TaskResult(this.option, this.task);
+  I4TaskResult(this.option, this.task, this.contentIndex);
   final I4Option option;
   final I4Task task;
+  final int contentIndex;
   bool completed = false;
-  String outcome = 'running'; // success | wrong | gave_up | timed_out
+  String outcome = 'running'; // success | wrong | gave_up | timed_out | aborted
   int timeMs = 0;
   int taps = 0;
   int rage = 0;
@@ -58,6 +90,7 @@ class I4TaskResult {
   Map<String, Object?> toJson() => {
         'option': option.id,
         'task': task.id,
+        'content_set': contentIndex,
         'completed': completed,
         'outcome': outcome,
         'time_ms': timeMs,
@@ -79,6 +112,8 @@ class Iter4Controller extends ChangeNotifier {
     ];
     order = [for (final i in squares[n % 3]) I4Option.values[i]];
     startedAt = DateTime.now();
+    // A re-run of the same ID starts a fresh event log (heatmap stays clean).
+    storage.writeEvents('I4-$participantId', const []);
   }
 
   static const timeLimit = Duration(minutes: 3);
@@ -91,68 +126,101 @@ class Iter4Controller extends ChangeNotifier {
   int optionIndex = 0;
   int taskIndex = 0;
   I4Phase phase = I4Phase.brief;
+  bool aborted = false;
   final List<I4TaskResult> results = [];
   List<I4Message> messages = [];
 
   I4TaskResult? _current;
   DateTime? _t0;
   Timer? _timeout;
-  int _script = 0; // cancels running scripts when the option/task changes
+  int _script = 0; // bumps cancel any running script
+  bool _repeatReady = false; // T2: garbled line fully shown
+  bool _disposed = false;
   final List<({DateTime t, Offset p})> _recent = [];
 
   I4Option get option => order[optionIndex];
   I4Task get task => I4Task.values[taskIndex];
+
+  /// Content rotates with the option's position in the session.
+  I4Content get content => I4Content.sets[optionIndex];
   bool get running => phase == I4Phase.running;
   int get elapsedSec => _t0 == null ? 0 : DateTime.now().difference(_t0!).inSeconds;
 
   I4Message? get lastPartner => messages.where((m) => !m.me).lastOrNull;
   I4Message? get lastMine => messages.where((m) => m.me).lastOrNull;
 
+  String get instruction => switch (task) {
+        I4Task.reply => 'Pesan ${content.order} ke kasir.',
+        I4Task.repeat => 'Tunggu ucapan kasir. Jika ada yang tidak jelas, minta kasir mengulang ucapannya.',
+        I4Task.recall => 'Berapa total harga yang tadi disebut kasir? Cari di aplikasi, lalu sebutkan ke peneliti.',
+      };
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
   // ---------------- Flow ----------------
 
   void startTask() {
     if (phase != I4Phase.brief) return;
-    _current = I4TaskResult(option, task);
+    _current = I4TaskResult(option, task, optionIndex);
     _t0 = DateTime.now();
     _timeout?.cancel();
     _timeout = Timer(timeLimit, () => _finish('timed_out', false));
+    _repeatReady = false;
     phase = I4Phase.running;
-    notifyListeners();
+    _notify();
     _log('task_started', {});
     _runScript();
   }
 
-  /// Scripted partner lines for the current task (same for every option).
+  /// Scripted partner lines for the current task (same structure for every
+  /// option, content varies by position).
   Future<void> _runScript() async {
     final id = ++_script;
+    final k = content;
     switch (task) {
       case I4Task.reply:
         await _say(id, 'Selamat siang! Mau pesan apa?');
       case I4Task.repeat:
-        await _say(id, 'Baik, nasi goreng tidak pedas.');
-        await _say(id, 'Totalnya dua puluh lima ribu ya.');
+        await _say(id, 'Baik, ${k.dish} ya.');
+        await _say(id, 'Totalnya ${k.total} ya.');
         await _say(id, 'Minumnya mau … (suara tidak jelas) …', garbled: true);
+        if (id == _script) _repeatReady = true;
       case I4Task.recall:
-        await _say(id, 'Minumnya mau es teh atau air putih?');
+        await _say(id, 'Oh, minumnya mau ${k.drink}?');
         await _say(id, 'Silakan ditunggu di meja nomor tujuh ya.');
     }
   }
 
   Future<void> _say(int id, String text, {bool garbled = false}) async {
     await Future<void>.delayed(const Duration(milliseconds: 900));
-    if (id != _script) return;
+    if (id != _script || _disposed) return;
     final m = I4Message(me: false, text: '', partial: true, garbled: garbled);
     messages.add(m);
     final words = text.split(' ');
     for (var i = 1; i <= words.length; i++) {
-      if (id != _script) return;
+      if (id != _script || _disposed) {
+        m.partial = false; // never leave a half line styled as "still speaking"
+        return;
+      }
       m.text = words.take(i).join(' ');
-      notifyListeners();
+      _notify();
       await Future<void>.delayed(const Duration(milliseconds: 90));
     }
     m.partial = false;
-    notifyListeners();
+    _notify();
   }
+
+  bool _orderOk(String low) {
+    final k = content;
+    if (!low.contains(k.dish)) return false;
+    if (RegExp('(tidak|gak|nggak|ga|jangan) mau ${k.dish}').hasMatch(low)) return false;
+    return RegExp('(tidak|gak|nggak|ga|jangan|tanpa|no)\\s+(pakai\\s+|terlalu\\s+|usah\\s+)?${k.modifier}').hasMatch(low);
+  }
+
+  static final _repeatRe = RegExp(
+      r'ulang|ulangi|sekali lagi|tidak (dengar|jelas|paham)|kurang jelas|pelan|^apa\??$|^maaf\??$|^hah\??$');
 
   /// The participant sends (and "speaks") a message.
   void send(String text) {
@@ -160,10 +228,10 @@ class Iter4Controller extends ChangeNotifier {
     if (t.isEmpty) return;
     final m = I4Message(me: true, text: t);
     messages.add(m);
-    notifyListeners();
+    _notify();
     Future<void>.delayed(const Duration(milliseconds: 900), () {
       m.spoken = true;
-      notifyListeners();
+      _notify();
     });
     final c = _current;
     if (!running || c == null) return;
@@ -172,16 +240,12 @@ class Iter4Controller extends ChangeNotifier {
     final low = t.toLowerCase();
     switch (task) {
       case I4Task.reply:
-        if (low.contains('nasi goreng') && (low.contains('pedas'))) {
-          _finish('success', true);
-        } else {
-          error('pesan_salah');
-        }
+        _orderOk(low) ? _finish('success', true) : error('pesan_salah');
       case I4Task.repeat:
-        if (RegExp(r'ulang|lagi|tidak (dengar|jelas)|kurang jelas|pelan|maaf\?').hasMatch(low)) {
+        if (_repeatRe.hasMatch(low) && _repeatReady) {
           _finish('success', true);
         } else {
-          error('pesan_salah');
+          error(_repeatReady ? 'pesan_salah' : 'terlalu_cepat');
         }
       case I4Task.recall:
         error('bertanya_ke_kasir'); // asking again instead of finding it
@@ -191,11 +255,11 @@ class Iter4Controller extends ChangeNotifier {
   /// Replay of a spoken message (allowed, not an error).
   void replay(I4Message m) {
     m.spoken = false;
-    notifyListeners();
+    _notify();
     _log('replay', {});
     Future<void>.delayed(const Duration(milliseconds: 900), () {
       m.spoken = true;
-      notifyListeners();
+      _notify();
     });
   }
 
@@ -205,7 +269,7 @@ class Iter4Controller extends ChangeNotifier {
     if (!running || c == null) return;
     c.errors.add(kind);
     _log('task_error', {'kind': kind});
-    notifyListeners();
+    _notify();
   }
 
   void track(String event) => _log(event, {});
@@ -215,7 +279,7 @@ class Iter4Controller extends ChangeNotifier {
     if (!running || task != I4Task.recall) return;
     _stopClock();
     phase = I4Phase.mark;
-    notifyListeners();
+    _notify();
   }
 
   void markAnswer(bool correct) {
@@ -225,6 +289,24 @@ class Iter4Controller extends ChangeNotifier {
   }
 
   void giveUp() => _finish('gave_up', false);
+
+  /// Researcher ends the whole session early.
+  void abort() {
+    _script++;
+    _timeout?.cancel();
+    final c = _current;
+    if (c != null) {
+      c
+        ..outcome = 'aborted'
+        ..timeMs = _t0 == null ? 0 : DateTime.now().difference(_t0!).inMilliseconds;
+      results.add(c);
+      _current = null;
+    }
+    aborted = true;
+    phase = I4Phase.done;
+    _save();
+    _notify();
+  }
 
   void _finish(String outcome, bool ok) {
     if (!running) return;
@@ -254,7 +336,7 @@ class Iter4Controller extends ChangeNotifier {
       phase = I4Phase.done;
     }
     _save();
-    notifyListeners();
+    _notify();
   }
 
   void nextOption() {
@@ -264,11 +346,12 @@ class Iter4Controller extends ChangeNotifier {
     taskIndex = 0;
     messages = [];
     phase = I4Phase.brief;
-    notifyListeners();
+    _notify();
   }
 
   // ---------------- Tracking ----------------
 
+  /// Called on pointer-up for taps only (scrolls/drags are filtered out).
   void onTap(Offset pos, Size screen) {
     final c = _current;
     if (!running || c == null) return;
@@ -280,8 +363,7 @@ class Iter4Controller extends ChangeNotifier {
       ..removeWhere((t) => now.difference(t.t) > const Duration(seconds: 1))
       ..add((t: now, p: pos));
     if (_recent.where((t) => (t.p - pos).distance < 40).length >= 3) {
-      c.rage++;
-      c.errors.add('rage_click');
+      c.rage++; // reported separately from errors
       _log('ux_rage_click', e);
       _recent.clear();
     }
@@ -293,9 +375,11 @@ class Iter4Controller extends ChangeNotifier {
       'at': DateTime.now().toIso8601String(),
       'participant': participantId,
       'study': 'iter4',
+      'run': startedAt.toIso8601String(),
       'variant': option.id,
       'screen': '/iter4/${option.id}',
       'task': task.id,
+      'content_set': optionIndex,
       'in_task': running,
       ...props,
     });
@@ -306,7 +390,8 @@ class Iter4Controller extends ChangeNotifier {
         'participant': participantId,
         'order': order.map((o) => o.id).toList(),
         'started_at': startedAt.toIso8601String(),
-        'finished': phase == I4Phase.done,
+        'finished': phase == I4Phase.done && !aborted,
+        'aborted': aborted,
         'tasks': results.map((r) => r.toJson()).toList(),
       };
 
@@ -314,6 +399,7 @@ class Iter4Controller extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _script++;
     _timeout?.cancel();
     super.dispose();

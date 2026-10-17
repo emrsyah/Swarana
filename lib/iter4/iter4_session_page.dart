@@ -6,6 +6,33 @@ import '../core/services/storage.dart';
 import 'iter4_controller.dart';
 import 'iter4_options.dart';
 
+/// Reports real taps only: pointer-up within 18 px of pointer-down, so
+/// scrolls and drags don't count.
+class TapTracker extends StatefulWidget {
+  const TapTracker({super.key, required this.onTap, required this.child});
+  final ValueChanged<Offset> onTap;
+  final Widget child;
+
+  @override
+  State<TapTracker> createState() => _TapTrackerState();
+}
+
+class _TapTrackerState extends State<TapTracker> {
+  final Map<int, Offset> _down = {};
+
+  @override
+  Widget build(BuildContext context) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (e) => _down[e.pointer] = e.position,
+        onPointerCancel: (e) => _down.remove(e.pointer),
+        onPointerUp: (e) {
+          final d = _down.remove(e.pointer);
+          if (d != null && (e.position - d).distance < 18) widget.onTap(e.position);
+        },
+        child: widget.child,
+      );
+}
+
 /// Runs one participant through 3 options × 3 tasks.
 class Iter4SessionPage extends StatefulWidget {
   const Iter4SessionPage({super.key, required this.participantId, required this.storage});
@@ -45,11 +72,11 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
     return PopScope(
       canPop: c.phase == I4Phase.done,
       child: Stack(children: [
-        Listener(
-          behavior: HitTestBehavior.translucent,
-          onPointerDown: (e) => c.onTap(e.position, size),
-          // Key per option so each starts fresh.
-          child: KeyedSubtree(key: ValueKey(c.option), child: buildOption(c)),
+        TapTracker(
+          onTap: (p) => c.onTap(p, size),
+          // Key per option and task so UI state (e.g. an open composer)
+          // never carries over.
+          child: KeyedSubtree(key: ValueKey('${c.option.id}-${c.taskIndex}'), child: buildOption(c)),
         ),
         if (c.phase == I4Phase.running) _pill(),
         if (c.phase != I4Phase.running) _overlay(context),
@@ -69,20 +96,45 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Text('${c.task.id} · $clock', style: const TextStyle(color: Colors.white)),
+            // Researcher: long-press the clock to end the whole session.
+            GestureDetector(
+              onLongPress: _confirmAbort,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Text('${c.task.id} · $clock', style: const TextStyle(color: Colors.white)),
+              ),
+            ),
             if (c.task == I4Task.recall)
               TextButton(
                 onPressed: c.foundAnswer,
                 child: const Text('Sudah ketemu', style: TextStyle(color: Colors.white)),
               ),
+            // Long-press so an accidental tap can't end the task.
             TextButton(
-              onPressed: c.giveUp,
+              onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Tekan lama untuk menyerah'), duration: Duration(seconds: 1))),
+              onLongPress: c.giveUp,
               child: const Text('Menyerah', style: TextStyle(color: Colors.white70)),
             ),
           ]),
         ),
       ),
     );
+  }
+
+  Future<void> _confirmAbort() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Akhiri sesi?'),
+        content: const Text('Tugas yang sudah selesai tetap tersimpan. Sesi ditandai "dihentikan".'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Akhiri')),
+        ],
+      ),
+    );
+    if (ok == true) c.abort();
   }
 
   Widget _overlay(BuildContext context) {
@@ -93,18 +145,19 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
           const SizedBox(height: 8),
           Text(c.task.title, style: t.headlineSmall),
           const SizedBox(height: 10),
-          Text(c.task.instruction, style: t.bodyLarge),
+          Text(c.instruction, style: t.bodyLarge),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: c.startTask,
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
             child: const Text('Mulai'),
           ),
+          TextButton(onPressed: _confirmAbort, child: const Text('Akhiri sesi')),
         ]),
       I4Phase.mark => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Untuk peneliti', style: t.labelLarge),
           const SizedBox(height: 8),
-          Text('Partisipan menjawab "dua puluh lima ribu" (Rp25.000)?', style: t.titleLarge),
+          Text('Partisipan menjawab "${c.content.total}" (${c.content.totalDigits})?', style: t.titleLarge),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () => c.markAnswer(true),
@@ -132,7 +185,8 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
       _ => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Selesai', style: t.headlineSmall),
           const SizedBox(height: 8),
-          Text('Semua tugas untuk ${c.participantId} sudah tersimpan.', style: t.bodyLarge),
+          Text(c.aborted ? 'Sesi ${c.participantId} dihentikan. Tugas yang selesai sudah tersimpan.'
+              : 'Semua tugas untuk ${c.participantId} sudah tersimpan.', style: t.bodyLarge),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),

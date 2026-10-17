@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../variants/v5_chat/design/tokens.dart';
 import 'iter4_controller.dart';
+import 'iter4_session_page.dart' show TapTracker;
 
 /// The three Iteration-4 interface options, built after the "Hasil Rapid AI
 /// Prototyping" frames. Partner speech is scripted (simulated captions).
@@ -58,7 +59,10 @@ void _showHistory(BuildContext context, Iter4Controller c) {
   showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
-    builder: (_) => DraggableScrollableSheet(
+    // The sheet is its own route, so it needs its own tap tracking.
+    builder: (ctx) => TapTracker(
+      onTap: (p) => c.onTap(p, MediaQuery.sizeOf(ctx)),
+      child: DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.6,
       builder: (_, scroll) => ListView(controller: scroll, padding: const EdgeInsets.all(20), children: [
@@ -70,6 +74,7 @@ void _showHistory(BuildContext context, Iter4Controller c) {
             child: Text('${m.me ? 'Saya' : 'Kasir'}: ${m.text}', style: const TextStyle(fontSize: 16, height: 1.4)),
           ),
       ]),
+    ),
     ),
   );
 }
@@ -263,10 +268,13 @@ class _DualOption extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Column(children: [
                   Expanded(
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text(mine?.text ?? '',
-                          textAlign: TextAlign.right, style: const TextStyle(fontSize: 26, height: 1.3)),
+                    child: SingleChildScrollView(
+                      reverse: true,
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: Text(mine?.text ?? '',
+                            textAlign: TextAlign.right, style: const TextStyle(fontSize: 26, height: 1.3)),
+                      ),
                     ),
                   ),
                   // The partner's hold-to-talk button (participant tapping it = error).
@@ -288,7 +296,9 @@ class _DualOption extends StatelessWidget {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // Scrolls instead of overflowing when the keyboard shrinks this half.
+              child: SingleChildScrollView(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 const Text('Kasir berkata', style: TextStyle(fontSize: 13, color: V5Colors.muted)),
                 const SizedBox(height: 6),
                 Text(theirs?.text ?? '',
@@ -302,8 +312,8 @@ class _DualOption extends StatelessWidget {
                     icon: Icon(mine.spoken ? Icons.volume_up : Icons.graphic_eq),
                     label: Text(mine.spoken ? 'Bunyikan lagi' : 'Dibunyikan…'),
                   ),
-                const Spacer(),
-              ]),
+                ]),
+              ),
             ),
           ),
           _Chips(c: c),

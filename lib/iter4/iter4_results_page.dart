@@ -36,6 +36,10 @@ class Iter4ResultsPage extends StatelessWidget {
               ? '–'
               : (rs.map((r) => r['errors'] as num).fold<num>(0, (a, b) => a + b) / rs.length).toStringAsFixed(1);
 
+          String rage(Iterable<Map<String, Object?>> rs) => rs.isEmpty
+              ? '–'
+              : (rs.map((r) => r['rage_clicks'] as num).fold<num>(0, (a, b) => a + b) / rs.length).toStringAsFixed(1);
+
           TableRow tr(List<String> cells, {bool bold = false}) => TableRow(children: [
                 for (final c in cells)
                   Padding(
@@ -51,6 +55,7 @@ class Iter4ResultsPage extends StatelessWidget {
               ('Completion rate', pct),
               ('Waktu rata-rata tugas berhasil (detik)', secs),
               ('Error per tugas (rata-rata)', errs),
+              ('Rage click per tugas (rata-rata)', rage),
             ]) ...[
               Text(metric.$1, style: t.titleMedium),
               Table(
@@ -66,8 +71,32 @@ class Iter4ResultsPage extends StatelessWidget {
             Text('Per partisipan', style: t.titleMedium),
             for (final s in studies)
               ExpansionTile(
-                title: Text('${s['participant']}${s['finished'] == true ? '' : ' · belum selesai'}'),
+                title: Text('${s['participant']}'
+                    '${s['aborted'] == true ? ' · dihentikan' : s['finished'] == true ? '' : ' · belum selesai'}'),
                 subtitle: Text((s['order'] as List).join(' → ')),
+                trailing: IconButton(
+                  tooltip: 'Hapus',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () async {
+                    final pid = s['participant'];
+                    final ok = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text('Hapus data $pid?'),
+                        actions: [
+                          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+                          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Hapus')),
+                        ],
+                      ),
+                    );
+                    if (ok != true || !context.mounted) return;
+                    await storage.deleteStudy('I4-$pid');
+                    if (context.mounted) {
+                      Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(builder: (_) => Iter4ResultsPage(storage: storage)));
+                    }
+                  },
+                ),
                 children: [
                   for (final r in (s['tasks'] as List).cast<Map>())
                     ListTile(
