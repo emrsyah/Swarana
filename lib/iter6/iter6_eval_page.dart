@@ -74,6 +74,12 @@ class _Iter6EvalPageState extends State<Iter6EvalPage> {
           const Divider(height: 32),
           Text('Interaksi berhasil: $success / 5', style: t.titleLarge),
           Text('Centang bila memenuhi "Berhasil bila". Macet > 60 detik = gagal.', style: t.bodySmall),
+          if (s.newsAnswer.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('Jawaban interaksi 1: "${s.newsAnswer}" · diulang ${s.newsRepeats}× '
+                  '(dicentang otomatis bila memuat Asia Afrika 45, periksa lagi)', style: t.bodyMedium),
+            ),
           for (var i = 0; i < 5; i++)
             CheckboxListTile(
               value: s.interactions[i],

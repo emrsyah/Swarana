@@ -74,7 +74,7 @@ class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
     // SEQ and SUS stay empty: they are filled from the paper forms.
     final app = StringBuffer('Partisipan,Kartu,Waktu (detik),Interaksi berhasil (0-5),SEQ (1-7),'
         'SUS1,SUS2,SUS3,SUS4,SUS5,SUS6,SUS7,SUS8,SUS9,SUS10,'
-        'Mode,Dinilai,I1,I2,I3,I4,I5,Ketukan,Rage click,Catatan\n');
+        'Mode,Dinilai,I1,I2,I3,I4,I5,Ketukan,Rage click,Catatan,Jawaban berita,Berita diulang\n');
     final conf = StringBuffer('Partisipan,Teks penyebab,Yang terjadi,Detik ke-,Sumber,Catatan\n');
     for (final r in rows) {
       final it = (r['interactions'] as List).cast<bool>();
@@ -83,6 +83,7 @@ class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
         for (var i = 0; i < 10; i++) '',
         r['mode'], r['scored'] == true ? 'ya' : 'tidak',
         ...it.map((b) => b ? 1 : 0), r['taps'], r['rage_clicks'], r['notes'],
+        r['news_answer'] ?? '', r['news_repeats'] ?? 0,
       ].map(_csvCell).join(','));
       for (final c in (r['confusions'] as List).cast<Map>()) {
         conf.writeln([

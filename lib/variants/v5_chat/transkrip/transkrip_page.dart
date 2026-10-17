@@ -19,7 +19,10 @@ import '../widgets/text_size_slider.dart';
 
 /// One-way live captions for media, meetings, announcements.
 class TranskripPage extends StatefulWidget {
-  const TranskripPage({super.key});
+  const TranskripPage({super.key, this.onStopped});
+
+  /// Test harness hook: replaces the save dialog when the transcript stops.
+  final void Function(String text)? onStopped;
 
   @override
   State<TranskripPage> createState() => _TranskripPageState();
@@ -122,6 +125,10 @@ class _TranskripPageState extends State<TranskripPage> {
       _startedAt = null;
       _quietHint = false;
     });
+    if (widget.onStopped != null) {
+      widget.onStopped!(text);
+      return;
+    }
     if (text.trim().isEmpty || !mounted) return;
     final r = await showSaveDialog(
       context,
@@ -146,7 +153,8 @@ class _TranskripPageState extends State<TranskripPage> {
     _sub?.cancel();
     _alertSub?.cancel();
     _quietTimer?.cancel();
-    _s.stt.stop();
+    // Only if this page is still recording: the next page may already be listening.
+    if (_running) _s.stt.stop();
     _scroll.dispose();
     super.dispose();
   }

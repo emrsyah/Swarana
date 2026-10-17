@@ -42,10 +42,18 @@ class I4Content {
     required this.totalDigits,
     required this.drink,
     required this.followUp,
+    required this.wrongConfirm,
+    required this.aliases,
   });
 
   /// Cashier's follow-up when only the dish was ordered.
   final String followUp;
+
+  /// Cashier checks back when the participant asks for the modifier.
+  final String wrongConfirm;
+
+  /// Ways people write the dish ("nasgor", "mi ayam", "baso").
+  final List<String> aliases;
 
   /// What the participant must order, as shown in the briefing.
   final String order;
@@ -60,13 +68,16 @@ class I4Content {
   static const sets = [
     I4Content(order: 'nasi goreng yang tidak pedas', dish: 'nasi goreng', modifier: 'pedas',
         total: 'dua puluh lima ribu', totalDigits: 'Rp25.000', drink: 'es teh atau air putih',
-        followUp: 'Nasi gorengnya pedas atau tidak?'),
+        followUp: 'Nasi gorengnya pedas atau tidak?', wrongConfirm: 'Nasi goreng pedas ya?',
+        aliases: ['nasi goreng', 'nasgor', 'nasi gorang']),
     I4Content(order: 'mie ayam tanpa sambal', dish: 'mie ayam', modifier: 'sambal',
         total: 'delapan belas ribu', totalDigits: 'Rp18.000', drink: 'teh hangat atau jeruk',
-        followUp: 'Mie ayamnya pakai sambal?'),
+        followUp: 'Mie ayamnya pakai sambal?', wrongConfirm: 'Mie ayam pakai sambal ya?',
+        aliases: ['mie ayam', 'mi ayam', 'mieayam', 'mie']),
     I4Content(order: 'bakso tanpa seledri', dish: 'bakso', modifier: 'seledri',
         total: 'tiga puluh dua ribu', totalDigits: 'Rp32.000', drink: 'es jeruk atau air mineral',
-        followUp: 'Baksonya pakai seledri?'),
+        followUp: 'Baksonya pakai seledri?', wrongConfirm: 'Bakso pakai seledri ya?',
+        aliases: ['bakso', 'baso']),
   ];
 }
 
@@ -196,6 +207,8 @@ class Iter4Controller extends ChangeNotifier {
     _timeout?.cancel();
     _timeout = Timer(timeLimit, () => _finish('timed_out', false));
     _repeatReady = false;
+    _dishSaid = _noModSaid = _modAsked = false;
+    _t1Reply = '';
     phase = I4Phase.running;
     _notify();
     _log('task_started', {});
@@ -245,11 +258,58 @@ class Iter4Controller extends ChangeNotifier {
     _notify();
   }
 
-  bool _orderOk(String low) {
+  // T1 conversation state: the order may come in pieces over several messages.
+  bool _dishSaid = false; // the dish was named in an earlier message
+  bool _noModSaid = false; // "tidak pedas" was said before the dish
+  bool _modAsked = false; // cashier's last reply asked about the modifier
+  String _t1Reply = '';
+
+  static const _neg = r'(tidak|gak|nggak|ngga|enggak|ga|jangan|tanpa|no)';
+  static final _bareNo = RegExp(r'^(tidak|gak|nggak|ngga|enggak|engga|ga|jangan|bukan|no|nope)\b|'
+      r'(tidak|gak|nggak|ga) usah|biasa( aja| saja)?$|^polos');
+  static final _bareYes = RegExp(r'^(iya|ya|yaa|boleh|mau|pakai|pake|yes|oke|ok)\b');
+  static final _drinkRe = RegExp(r'\b(teh|jeruk|air|minum|kopi|es)\b');
+
+  /// One T1 message: true when the full order is now known (this message
+  /// together with earlier ones), and sets the cashier's rule-based reply.
+  bool _orderStep(String low) {
     final k = content;
-    if (!low.contains(k.dish)) return false;
-    if (RegExp('(tidak|gak|nggak|ga|jangan) mau ${k.dish}').hasMatch(low)) return false;
-    return RegExp('(tidak|gak|nggak|ga|jangan|tanpa|no)\\s+(pakai\\s+|terlalu\\s+|usah\\s+)?${k.modifier}').hasMatch(low);
+    final hasDish = k.aliases.any(low.contains);
+    final asked = _modAsked;
+    final lastReply = _t1Reply;
+    _modAsked = false;
+    if (RegExp('\\b$_neg (mau|jadi) (${k.aliases.join('|')})').hasMatch(low)) {
+      _dishSaid = false;
+      _t1Reply = 'Oh, tidak jadi ${k.dish}? Mau pesan apa?';
+      return false;
+    }
+    final noMod = RegExp('\\b$_neg\\s+(pakai\\s+|pake\\s+|terlalu\\s+|usah\\s+)?${k.modifier}').hasMatch(low) ||
+        (asked && _bareNo.hasMatch(low));
+    final yesMod = !noMod && (low.contains(k.modifier) || (asked && _bareYes.hasMatch(low)));
+    final dishKnown = _dishSaid || hasDish;
+    if (hasDish) _dishSaid = true;
+    if (noMod) _noModSaid = true;
+    if (dishKnown && (noMod || _noModSaid)) {
+      _t1Reply = 'Baik, ${k.order} ya.';
+      return true;
+    }
+    if (dishKnown && yesMod && lastReply == k.wrongConfirm) {
+      // Confirmed the wrong order: a real cashier takes it (they can still correct).
+      _t1Reply = 'Baik, ${k.wrongConfirm.replaceFirst(' ya?', '').toLowerCase()} ya. Ada lagi?';
+    } else if (dishKnown && yesMod) {
+      _t1Reply = k.wrongConfirm; // lets them correct it
+      _modAsked = true;
+    } else if (dishKnown) {
+      _t1Reply = k.followUp;
+      _modAsked = true;
+    } else if (noMod) {
+      _t1Reply = 'Baik, tidak ${k.modifier}. Mau pesan apa?';
+    } else if (_drinkRe.hasMatch(low)) {
+      _t1Reply = 'Minumnya nanti ya. Makannya mau pesan apa?';
+    } else {
+      _t1Reply = 'Iya, mau pesan apa?';
+    }
+    return false;
   }
 
   static final _repeatRe = RegExp(
@@ -274,7 +334,7 @@ class Iter4Controller extends ChangeNotifier {
     final bool ruleOk;
     switch (task) {
       case I4Task.reply:
-        ruleOk = _orderOk(low);
+        ruleOk = _orderStep(low);
         if (!ruleOk) error('pesan_salah');
       case I4Task.repeat:
         if (!_repeatReady) {
@@ -333,11 +393,7 @@ class Iter4Controller extends ChangeNotifier {
   String _ruleReply(String low, bool ok) {
     final k = content;
     return switch (task) {
-      I4Task.reply => ok
-          ? 'Baik, ${k.order} ya.'
-          : low.contains(k.dish)
-              ? k.followUp
-              : 'Maaf, mau pesan apa?',
+      I4Task.reply => _t1Reply,
       I4Task.repeat => ok ? 'Oh maaf. Minumnya mau ${k.drink}?' : 'Iya? Minumnya mau apa?',
       I4Task.recall => RegExp(r'berapa|total|harga|bayar|semua').hasMatch(low)
           ? 'Totalnya ${k.total} ya.'
@@ -348,10 +404,13 @@ class Iter4Controller extends ChangeNotifier {
   String get _goal {
     final k = content;
     return switch (task) {
-      I4Task.reply => 'Pelanggan harus memesan ${k.order}. Tercapai hanya bila pelanggan jelas '
-          'menyebut ${k.dish} DAN bahwa ia tidak mau ${k.modifier}. Jika baru menyebut ${k.dish} saja, '
-          'tanyakan: "${k.followUp}". Jika tercapai, konfirmasi pesanannya. '
-          'Jangan menyebut harga.',
+      I4Task.reply => 'Pelanggan harus memesan ${k.order}. Pesanan boleh disampaikan dalam beberapa pesan. '
+          'Tercapai bila dari seluruh percakapan pelanggan sudah menyebut ${k.dish} DAN tidak mau ${k.modifier} '
+          '(termasuk menjawab "tidak"/"gak usah" atas pertanyaanmu soal ${k.modifier}). '
+          'Jika baru bilang mau pesan tanpa menyebut menu, tanyakan mau pesan apa. '
+          'Jika baru menyebut ${k.dish} saja, tanyakan: "${k.followUp}". '
+          'Jika ia minta pakai ${k.modifier}, pastikan dulu: "${k.wrongConfirm}". '
+          'Jika tercapai, konfirmasi pesanannya. Jangan menyebut harga.',
       I4Task.repeat => 'Ucapan terakhirmu tadi tidak jelas terdengar. Pelanggan harus meminta kamu '
           'mengulang (misalnya "bisa ulangi?", "maaf?", "apa?", "tidak jelas"). Tercapai bila pelanggan '
           'meminta diulang; lalu ulangi dengan jelas: "Minumnya mau ${k.drink}?". '

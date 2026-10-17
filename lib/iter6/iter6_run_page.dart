@@ -8,6 +8,7 @@ import '../iter4/iter4_session_page.dart' show TapTracker;
 import '../ux_kit/ux_controller.dart';
 import '../variant/variant.dart';
 import '../variants/v5_chat/obrolan/obrolan_page.dart';
+import '../variants/v5_chat/transkrip/transkrip_page.dart';
 import '../variants/v5_chat/v5_routes.dart';
 import '../variants/v5_chat/v5_spec.dart';
 import 'iter6_eval_page.dart';
@@ -58,8 +59,94 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     _ux.sink = s; // capture the v5 app's own events
     _theme = V5Spec().theme;
     _observer = _RouteObserver(s.onRoute);
-    _sttSub = _services.stt.events.where((e) => e.isFinal).listen((e) => s.partnerLine(e.text));
+    _sttSub = _services.stt.events.where((e) => e.isFinal).listen((e) {
+      s.partnerLine(e.text);
+      // Simulation: the question appears as soon as the news has played.
+      if (_newsPhase && s.simulated && e.text == newsText) {
+        Future<void>.delayed(const Duration(milliseconds: 800), _askNews);
+      }
+    });
+    _services.stt.status.addListener(_onSttStatus);
     s.start();
+  }
+
+  // Interaction 1 runs in Transkrip; the teller part (2–5) in Obrolan.
+  bool _newsPhase = true;
+  bool _askingNews = false;
+  bool _pendingRepeat = false;
+
+  /// A repeat asked while the transcript was stopped plays once it records again.
+  void _onSttStatus() {
+    if (_pendingRepeat && _services.stt.status.value == SttStatus.listening) {
+      _pendingRepeat = false;
+      _services.scripted?.repeatLast();
+    }
+  }
+
+  Future<void> _askNews() async {
+    if (!_newsPhase || _askingNews || !mounted) return;
+    _askingNews = true;
+    final ctl = TextEditingController();
+    final r = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Pertanyaan'),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('Di mana alamat kantor cabang baru Bank Nusantara Jaya?', style: TextStyle(fontSize: 18)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: ctl,
+              autofocus: true,
+              minLines: 1,
+              maxLines: 3,
+              decoration: const InputDecoration(hintText: 'Tulis jawabanmu', border: OutlineInputBorder()),
+            ),
+          ]),
+          actions: [
+            TextButton.icon(
+              onPressed: () => Navigator.pop(ctx, '__ulangi'),
+              icon: const Icon(Icons.replay),
+              label: const Text('Ulangi rekaman'),
+            ),
+            FilledButton(
+              onPressed: () {
+                if (ctl.text.trim().isNotEmpty) Navigator.pop(ctx, ctl.text);
+              },
+              child: const Text('Kirim jawaban'),
+            ),
+          ],
+        ),
+      ),
+    );
+    _askingNews = false;
+    if (r == null || !mounted) return;
+    if (r == '__ulangi') {
+      s.repeatNews();
+      if (!s.simulated) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Minta evaluator memutar ulang rekaman.')));
+      } else if (_services.stt.status.value == SttStatus.listening) {
+        _services.scripted?.repeatLast();
+      } else {
+        _pendingRepeat = true;
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Tekan tombol mikrofon untuk mendengarkan lagi.')));
+      }
+      return;
+    }
+    s.answerNews(r);
+    _newsPhase = false;
+    _pendingRepeat = false;
+    await _services.stt.stop();
+    _services.scripted?.userReplied(); // teller lines follow once Obrolan listens
+    _nav.currentState?.pushNamedAndRemoveUntil(V5Routes.obrolan, (_) => false);
+    // Make sure Obrolan is listening after the transition settles.
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted && _services.stt.status.value != SttStatus.listening) _services.stt.start();
+    });
   }
 
   late final SttService _rootStt;
@@ -69,6 +156,7 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
   @override
   void dispose() {
     _sttSub?.cancel();
+    _services.stt.status.removeListener(_onSttStatus);
     _ux.sink = _oldSink;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _services.dispose();
@@ -80,6 +168,9 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
   Route<dynamic>? _route(RouteSettings rs) {
     // No researcher tools inside a participant's run (2 s title press).
     if (rs.name == '/researcher' || rs.name == '/results') return null;
+    if (rs.name == V5Routes.transkrip && _newsPhase) {
+      return MaterialPageRoute(settings: rs, builder: (_) => TranskripPage(onStopped: (_) => _askNews()));
+    }
     final b = V5Spec().routes[rs.name];
     return MaterialPageRoute(
       settings: rs,
@@ -133,29 +224,36 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
                 key: _nav,
                 // Exactly one starting screen (initialRoute would also push '/'
                 // and '/v5', mounting a second chat).
-                onGenerateInitialRoutes: (_, _) => [_route(const RouteSettings(name: V5Routes.obrolan))!],
+                // Starts in Transkrip for the news (interaction 1).
+                onGenerateInitialRoutes: (_, _) => [_route(const RouteSettings(name: V5Routes.transkrip))!],
                 onGenerateRoute: _route,
                 observers: [_observer],
               ),
             ),
-            // Evaluator pill: long-press to finish (participant can't end it by accident).
+            // Evaluator handle: a small red dot inside the status bar, so it
+            // covers none of the app. Long-press it to finish (participant
+            // can't end it by accident). No clock, to avoid time pressure.
             Positioned(
-              left: 8,
-              bottom: MediaQuery.paddingOf(context).bottom + 96,
-              child: GestureDetector(
-                onLongPress: _finish,
-                child: Material(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    // No visible clock (avoids time pressure); the time is on the
-                    // evaluator's page. A dot shows the recording is running.
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle)),
-                      const SizedBox(width: 6),
-                      Text(s.card, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                    ]),
+              top: 0,
+              left: 0,
+              right: 0,
+              // Left of centre: the middle is the camera cut-out on most phones.
+              child: Align(
+                alignment: const Alignment(-0.3, 0),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onLongPress: _finish,
+                  child: SizedBox(
+                    width: 56,
+                    height: MediaQuery.paddingOf(context).top.clamp(24, 48).toDouble(),
+                    child: Align(
+                      alignment: const Alignment(0, 0.2),
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle),
+                      ),
+                    ),
                   ),
                 ),
               ),

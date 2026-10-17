@@ -49,6 +49,32 @@ class Iter6Session implements UxEventSink {
   final List<({int atSec, double x, double y, String screen})> rageAt = [];
   final List<({DateTime t, Offset p})> _recent = [];
 
+  // Interaction 1 (news in Transkrip): the answer typed in the question modal.
+  String newsAnswer = '';
+  int newsRepeats = 0;
+  int? newsAnsweredSec;
+
+  /// Address check for interaction 1; pre-ticks the box, the evaluator confirms.
+  static bool newsAnswerOk(String a) {
+    final low = a.toLowerCase();
+    return RegExp(r'asia\s*-?\s*afrika|asia\s*africa').hasMatch(low) && RegExp(r'\b45\b|empat puluh lima').hasMatch(low);
+  }
+
+  void answerNews(String text) {
+    if (!running) return;
+    newsAnswer = text.trim();
+    newsAnsweredSec = _sec();
+    interactions[0] = newsAnswerOk(newsAnswer);
+    transcript.add((atSec: _sec(), me: true, text: 'Jawaban berita: $newsAnswer'));
+    _log('news_answered', {'text': newsAnswer, 'auto_ok': interactions[0], 'repeats': newsRepeats});
+  }
+
+  void repeatNews() {
+    if (!running) return;
+    newsRepeats++;
+    _log('news_repeat', {});
+  }
+
   // Evaluator input
   final List<bool> interactions = List.filled(5, false);
   final List<I6Confusion> confusions = [];
@@ -168,6 +194,9 @@ class Iter6Session implements UxEventSink {
         'started_at': startedAt?.toIso8601String(),
         'ended_at': endedAt?.toIso8601String(),
         'time_s': elapsedSec,
+        'news_answer': newsAnswer,
+        'news_answered_s': newsAnsweredSec,
+        'news_repeats': newsRepeats,
         'interactions': interactions,
         'success_count': interactions.where((e) => e).length,
         'confusions': confusions.where((c) => c.include).map((c) => c.toJson()).toList(),

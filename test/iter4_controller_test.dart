@@ -45,6 +45,49 @@ void main() {
     c.dispose();
   });
 
+  test('T1 order in pieces: the cashier asks, a short answer completes it', () async {
+    // (messages, expected cashier reply after the last one, completed?)
+    for (final (msgs, reply, ok) in [
+      (['mau pesan'], 'Iya, mau pesan apa?', false),
+      (['mau pesan', 'nasi goreng'], 'Nasi gorengnya pedas atau tidak?', false),
+      (['nasi goreng', 'tidak'], 'Baik, nasi goreng yang tidak pedas ya.', true),
+      (['nasgor', 'gak usah'], 'Baik, nasi goreng yang tidak pedas ya.', true),
+      (['nasi goreng', 'nggak pedas ya'], 'Baik, nasi goreng yang tidak pedas ya.', true),
+      (['yang tidak pedas', 'nasi goreng'], 'Baik, nasi goreng yang tidak pedas ya.', true),
+      (['nasi goreng pedas'], 'Nasi goreng pedas ya?', false),
+      (['nasi goreng pedas', 'bukan, tidak pedas'], 'Baik, nasi goreng yang tidak pedas ya.', true),
+      (['nasi goreng pedas', 'iya'], 'Baik, nasi goreng pedas ya. Ada lagi?', false),
+      (['es teh'], 'Minumnya nanti ya. Makannya mau pesan apa?', false),
+      (['nasi goreng juga pedas'], 'Nasi goreng pedas ya?', false),
+    ]) {
+      final c = make()..startTask();
+      for (final m in msgs) {
+        c.send(m);
+        await Future<void>.delayed(const Duration(milliseconds: 2500));
+      }
+      expect(c.messages.lastWhere((m) => !m.me).text, reply, reason: '$msgs');
+      await Future<void>.delayed(const Duration(seconds: 2));
+      expect(c.results.isNotEmpty && c.results.single.completed, ok, reason: '$msgs');
+      c.dispose();
+    }
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
+  test('T3 cashier repeats the total when asked', () async {
+    final c = make()..startTask();
+    c.send('nasi goreng tidak pedas');
+    await Future<void>.delayed(settle);
+    c.startTask(); // T2
+    c.endManually();
+    c.markAnswer(true);
+    c.startTask(); // T3
+    c.send('totalnya berapa ya?');
+    await Future<void>.delayed(settle);
+    expect(c.messages.last.text, 'Totalnya dua puluh lima ribu ya.');
+    expect(c.current!.askedCashier, isTrue);
+    expect(c.current!.errors, isEmpty);
+    c.dispose();
+  });
+
   test('researcher can end a task by hand', () async {
     final c = make()..startTask();
     c.send('nasi goreng, yang biasa aja');

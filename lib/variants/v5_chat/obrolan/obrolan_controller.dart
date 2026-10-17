@@ -182,7 +182,7 @@ class ObrolanController extends ChangeNotifier {
   }
 
   static final _repeatRe =
-      RegExp(r'ulang|ulangi|sekali lagi|tidak (dengar|jelas)|kurang jelas|pelan-pelan|^apa\??$|^hah\??$');
+      RegExp(r'ulang|ulangi|sekali lagi|tidak (dengar|jelas)|kurang jelas|pelan-pelan|^apa\??$|^hah\??$|^maaf\??$');
   static bool _isRepeatRequest(String t) => _repeatRe.hasMatch(t.toLowerCase());
 
   Future<void> speak(ChatMessage m) async {
