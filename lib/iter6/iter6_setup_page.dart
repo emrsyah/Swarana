@@ -14,20 +14,39 @@ class Iter6SetupPage extends StatefulWidget {
 }
 
 class _Iter6SetupPageState extends State<Iter6SetupPage> {
-  final _pid = TextEditingController(text: 'TT01');
+  final _pid = TextEditingController();
   String _card = 'A';
+  String _autoAssigned = 'A';
   bool _simulated = false;
   bool _showCard = false;
 
+  String get _id => Iter6Session.cleanId(_pid.text);
+
   void _autoCard(String pid) {
     final n = int.tryParse(pid.replaceAll(RegExp(r'\D'), ''));
-    if (n != null) setState(() => _card = n.isOdd ? 'A' : 'B');
+    if (n != null) setState(() => _card = _autoAssigned = n.isOdd ? 'A' : 'B');
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _autoCard(_pid.text);
+  /// Warn before a re-run overwrites an existing participant's data.
+  Future<void> _toCard() async {
+    final existing = await AppHandle.read(context).storage.studies();
+    if (!mounted) return;
+    final exists = existing.any((s) => s['type'] == 'iter6' && s['participant'] == _id);
+    if (exists) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('Data $_id sudah ada'),
+          content: const Text('Melanjutkan akan menimpa data dan tracking sebelumnya untuk ID ini.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+            TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Timpa')),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    setState(() => _showCard = true);
   }
 
   @override
@@ -39,10 +58,11 @@ class _Iter6SetupPageState extends State<Iter6SetupPage> {
   void _start() {
     final app = AppHandle.read(context);
     final session = Iter6Session(
-      participantId: _pid.text.trim(),
+      participantId: _id,
       card: _card,
       simulated: _simulated,
       storage: app.storage,
+      cardOverridden: _card != _autoAssigned,
     );
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       settings: const RouteSettings(name: '/iter6/run'),
@@ -97,7 +117,7 @@ class _Iter6SetupPageState extends State<Iter6SetupPage> {
         ),
         const SizedBox(height: 8),
         FilledButton(
-          onPressed: _pid.text.trim().isEmpty ? null : () => setState(() => _showCard = true),
+          onPressed: _id.isEmpty ? null : _toCard,
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
           child: const Text('Lanjut ke kartu nasabah'),
         ),
@@ -134,8 +154,9 @@ class _Iter6SetupPageState extends State<Iter6SetupPage> {
         const SizedBox(height: 12),
         Text('Kamu nasabah yang mau buka rekening. Pakai Swarana saja untuk berkomunikasi.', style: t.bodyLarge),
         const SizedBox(height: 8),
-        Text('Untuk evaluator: tekan Mulai bersamaan dengan rekaman berita diputar. '
-            'Tekan lama penghitung waktu saat formulir selesai.', style: t.bodySmall),
+        Text('Untuk evaluator: berikan juga kartu cetak (kartu ini hilang setelah Mulai). '
+            'Tekan Mulai tepat saat rekaman berita diputar. Saat formulir selesai, tekan lama titik merah. '
+            'Catat kebingungan di kertas selama role-play, lalu masukkan di halaman penilaian.', style: t.bodySmall),
         const SizedBox(height: 20),
         FilledButton(
           onPressed: _start,

@@ -291,7 +291,7 @@ class UxController extends ChangeNotifier {
   /// A message the user sent, with where its characters came from.
   void messageSent(String text, Composition c, {MessageSource? override}) {
     final bucket = mixKey(override ?? c.majority);
-    _emit('message_sent', {'bucket': bucket, 'composition': c.toJson(), 'length': text.length});
+    _emit('message_sent', {'bucket': bucket, 'composition': c.toJson(), 'length': text.length, 'text': text});
     if (!isRunning) return;
     _mix[bucket] = (_mix[bucket] ?? 0) + 1;
     _messages.add({'bucket': bucket, 'composition': c.toJson(), 'text': text, 'at_ms': elapsed.inMilliseconds});

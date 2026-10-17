@@ -29,6 +29,7 @@ class _Iter6EvalPageState extends State<Iter6EvalPage> {
           SnackBar(content: Text('$missing kebingungan belum diisi teks penyebabnya.')));
       return;
     }
+    s.scored = true;
     await s.save();
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Data ${s.participantId} tersimpan')));
@@ -49,6 +50,27 @@ class _Iter6EvalPageState extends State<Iter6EvalPage> {
               style: t.titleMedium),
           Text('${s.taps} ketukan · ${s.rage} rage click · pesan: '
               '${s.sendsBySource.entries.map((e) => '${e.key} ${e.value}').join(', ')}', style: t.bodySmall),
+          const SizedBox(height: 8),
+          // What was actually said and sent, to check the criteria against.
+          ExpansionTile(
+            initiallyExpanded: true,
+            tilePadding: EdgeInsets.zero,
+            title: Text('Transkrip obrolan (${s.transcript.length})', style: t.titleMedium),
+            children: [
+              if (s.transcript.isEmpty) const Text('Tidak ada pesan tercatat.'),
+              for (final m in s.transcript)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    SizedBox(width: 52, child: Text(_mmss(m.atSec), style: t.bodySmall)),
+                    Expanded(
+                      child: Text('${m.me ? 'Nasabah' : 'Lawan bicara'}: ${m.text}',
+                          style: t.bodyMedium?.copyWith(fontWeight: m.me ? FontWeight.w600 : FontWeight.w400)),
+                    ),
+                  ]),
+                ),
+            ],
+          ),
           const Divider(height: 32),
           Text('Interaksi berhasil: $success / 5', style: t.titleLarge),
           Text('Centang bila memenuhi "Berhasil bila". Macet > 60 detik = gagal.', style: t.bodySmall),
@@ -79,6 +101,22 @@ class _Iter6EvalPageState extends State<Iter6EvalPage> {
                   ]),
                   if (c.note.isNotEmpty) Text(c.note, style: t.bodySmall),
                   if (c.include) ...[
+                    if (c.source == 'manual')
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: TextFormField(
+                          initialValue: c.atSec == 0 ? '' : _mmss(c.atSec),
+                          keyboardType: TextInputType.datetime,
+                          onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                          decoration: const InputDecoration(labelText: 'Menit (mm:ss, dari stopwatch)', border: OutlineInputBorder()),
+                          onChanged: (v) {
+                            final p = v.split(':');
+                            final m = int.tryParse(p.first) ?? 0;
+                            final sec = p.length > 1 ? int.tryParse(p[1]) ?? 0 : 0;
+                            c.atSec = p.length > 1 ? m * 60 + sec : m * 60;
+                          },
+                        ),
+                      ),
                     const SizedBox(height: 8),
                     Wrap(spacing: 8, children: [
                       for (final ty in confusionTypes)

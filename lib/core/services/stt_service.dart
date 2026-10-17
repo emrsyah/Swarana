@@ -111,6 +111,10 @@ class LiveSttService implements SttService {
     if (!_wanted || _stt.isListening) return;
     _committed = 0;
     _lastText = '';
+    // SpeechToText is a process-wide singleton whose callbacks stay bound to
+    // whoever initialised it first; claim them for this service each time.
+    _stt.statusListener = _onStatus;
+    _stt.errorListener = _onError;
     _status.value = SttStatus.listening;
     await _stt.listen(
       onResult: _onResult,

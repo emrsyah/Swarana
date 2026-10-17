@@ -59,7 +59,8 @@ class I6Card {
   /// "Berhasil bila" per interaction, with this card's expected answer.
   List<(String, String)> get criteria => [
         ('1 · Rekaman berita', 'Nasabah menyebut alamat bank dengan benar: Jl. Asia Afrika No. 45.'),
-        ('2 · Tujuan rekening', 'Petugas bisa menyebutkan tujuan nasabah dengan benar.'),
+        ('2 · Tujuan rekening',
+            'Petugas bisa menyebutkan tujuan nasabah dengan benar. (Simulasi: tujuan tertulis jelas di pesan.)'),
         ('3 · Dokumen', npwp ? 'Jawaban sesuai kartu: KTP ada, NPWP ada.' : 'Jawaban sesuai kartu: KTP ada, NPWP tidak ada.'),
         ('4 · Setoran awal', 'Nasabah menyebut nominal setoran dengan benar: $deposit.'),
         ('5 · Formulir', 'Identitas ditulis lengkap dengan urutan: $formOrder.'),
@@ -69,27 +70,29 @@ class I6Card {
   ScenarioForm get form => ScenarioForm(
         instruction: 'Kamu nasabah yang mau buka rekening. Pakai Swarana saja untuk berkomunikasi.',
         turns: [
+          // Suggestions are deliberately neutral: they never contain an answer
+          // that a criterion checks (purpose, documents, amount, order).
           ScenarioTurn(speaker: 's1', text: newsText, suggest: const ['Bisa diulang?', 'Terima kasih']),
           ScenarioTurn(waitForUser: true),
           ScenarioTurn(
             speaker: 's2',
             text: 'Selamat siang, selamat datang di Bank Nusantara Jaya. Ada yang bisa saya bantu? Rekeningnya mau dipakai untuk apa?',
-            suggest: const ['Saya mau buka rekening tabungan', 'Untuk menerima gaji', 'Untuk usaha'],
+            suggest: const ['Selamat siang', 'Saya mau buka rekening', 'Bisa diulang?'],
           ),
           ScenarioTurn(waitForUser: true),
           ScenarioTurn(
             speaker: 's2',
             text: 'Baik. Apakah Bapak atau Ibu membawa KTP dan NPWP?',
-            suggest: const ['KTP ada, NPWP tidak ada', 'KTP dan NPWP ada', 'Bisa diulang?'],
+            suggest: const ['Sebentar', 'Bisa diulang?', 'Terima kasih'],
           ),
           ScenarioTurn(waitForUser: true),
           ScenarioTurn(
             speaker: 's2',
             text: 'Untuk rekening baru, setoran awalnya minimal $depositWords.',
-            suggest: const ['Baik, saya setor', 'Bisa diulang?', 'Berapa?'],
+            suggest: const ['Baik', 'Bisa diulang?', 'Terima kasih'],
           ),
           ScenarioTurn(waitForUser: true),
-          ScenarioTurn(speaker: 's2', text: formLine, suggest: const ['Baik', 'Bisa diulang urutannya?', 'Terima kasih']),
+          ScenarioTurn(speaker: 's2', text: formLine, suggest: const ['Baik', 'Bisa diulang?', 'Terima kasih']),
         ],
       );
 }

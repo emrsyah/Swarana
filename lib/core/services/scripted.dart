@@ -142,6 +142,21 @@ class ScriptedStt implements SttService {
     _events.add(SttEvent(turn.text!, isFinal: true, speakerId: _speaker, confidence: 0.95));
   }
 
+  /// The participant asked to hear it again: replay the last partner line
+  /// without moving the script on (a human partner may repeat verbatim).
+  Future<void> repeatLast() async {
+    if (_playing || _disposed) return;
+    for (var i = _index - 1; i >= 0; i--) {
+      final t = form.turns[i];
+      if (t.text != null) {
+        _playing = true;
+        await _speak(t);
+        _playing = false;
+        return;
+      }
+    }
+  }
+
   @override
   void userReplied() {
     if (!_waitingForUser) return; // idempotent: extra sends don't skip turns

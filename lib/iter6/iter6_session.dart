@@ -19,9 +19,19 @@ class I6Confusion {
 }
 
 class Iter6Session implements UxEventSink {
-  Iter6Session({required this.participantId, required this.card, required this.simulated, required this.storage}) {
+  Iter6Session({required this.participantId, required this.card, required this.simulated, required this.storage,
+      this.cardOverridden = false}) {
     storage.writeEvents('I6-$participantId', const []);
   }
+
+  /// Safe for file names: letters, digits, dash, underscore.
+  static String cleanId(String raw) => raw.trim().toUpperCase().replaceAll(RegExp(r'[^A-Z0-9_-]'), '');
+
+  final bool cardOverridden;
+
+  /// Chat transcript for the evaluator (partner finals and sent messages).
+  final List<({int atSec, bool me, String text})> transcript = [];
+  bool scored = false;
 
   final String participantId;
   final String card;
@@ -53,9 +63,14 @@ class Iter6Session implements UxEventSink {
     _log('roleplay_started', {});
   }
 
-  void end() {
+  void partnerLine(String text) {
+    if (running) transcript.add((atSec: _sec(), me: false, text: text));
+  }
+
+  /// [at] lets the evaluator's confirmation dialog not count as task time.
+  void end({DateTime? at}) {
     if (!running) return;
-    endedAt = DateTime.now();
+    endedAt = at ?? DateTime.now();
     _log('roleplay_ended', {'time_ms': endedAt!.difference(startedAt!).inMilliseconds});
     _proposeConfusions();
     save();
@@ -95,10 +110,11 @@ class Iter6Session implements UxEventSink {
       final b = props['bucket'] as String? ?? 'keyboard';
       sendsBySource[b] = (sendsBySource[b] ?? 0) + 1;
       sends.add((atSec: _sec(), text: '${props['length']} karakter · $b'));
+      transcript.add((atSec: _sec(), me: true, text: '${props['text'] ?? ''}'));
     }
     _log(event, {
       for (final e in props.entries)
-        if (!const {'event', 'at', 'participant', 'variant', 'order_position', 'scenario', 'in_task', 'elapsed_ms'}
+        if (!const {'event', 'at', 'participant', 'variant', 'order_position', 'scenario', 'in_task', 'elapsed_ms', 'screen'}
             .contains(e.key))
           e.key: e.value,
     });
@@ -107,7 +123,9 @@ class Iter6Session implements UxEventSink {
   /// Candidate confusion moments for the evaluator to confirm: long pauses
   /// between actions (Ragu?) and rage clicks (Salah tekan?).
   void _proposeConfusions() {
-    final marks = [0, ...tapTimes, elapsedSec];
+    // Actions = taps and sent messages; partner lines also reset the gap
+    // (time spent reading/listening is not hesitation).
+    final marks = <int>{0, ...tapTimes, ...transcript.map((t) => t.atSec), elapsedSec}.toList()..sort();
     for (var i = 1; i < marks.length; i++) {
       if (marks[i] - marks[i - 1] >= 15) {
         confusions.add(I6Confusion(
@@ -144,6 +162,9 @@ class Iter6Session implements UxEventSink {
         'participant': participantId,
         'card': card,
         'mode': simulated ? 'simulasi' : 'teller_manusia',
+        'card_overridden': cardOverridden,
+        'scored': scored,
+        'transcript': [for (final t in transcript) {'at_s': t.atSec, 'who': t.me ? 'nasabah' : 'lawan bicara', 'text': t.text}],
         'started_at': startedAt?.toIso8601String(),
         'ended_at': endedAt?.toIso8601String(),
         'time_s': elapsedSec,

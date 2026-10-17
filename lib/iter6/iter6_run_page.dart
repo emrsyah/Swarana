@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../core/services/services.dart';
+import '../core/services/stt_service.dart';
 import '../iter4/iter4_session_page.dart' show TapTracker;
 import '../ux_kit/ux_controller.dart';
 import '../variant/variant.dart';
@@ -31,7 +32,6 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
   late final UxEventSink _oldSink;
   late final ThemeData _theme;
   late final _RouteObserver _observer;
-  Timer? _tick;
   bool _init = false;
 
   Iter6Session get s => widget.session;
@@ -42,6 +42,11 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     if (_init) return;
     _init = true;
     final app = AppHandle.read(context);
+    // The main app's chat is still mounted underneath and may be listening:
+    // pause it so it doesn't hold the (singleton) recognizer, resume after.
+    _rootStt = Services.read(context).stt;
+    _rootWasListening = _rootStt.status.value == SttStatus.listening;
+    if (_rootWasListening) _rootStt.pause();
     _services = Services.create(
       storage: app.storage,
       settings: app.settings,
@@ -53,19 +58,28 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     _ux.sink = s; // capture the v5 app's own events
     _theme = V5Spec().theme;
     _observer = _RouteObserver(s.onRoute);
+    _sttSub = _services.stt.events.where((e) => e.isFinal).listen((e) => s.partnerLine(e.text));
     s.start();
-    _tick = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
   }
+
+  late final SttService _rootStt;
+  bool _rootWasListening = false;
+  StreamSubscription<SttEvent>? _sttSub;
 
   @override
   void dispose() {
-    _tick?.cancel();
+    _sttSub?.cancel();
     _ux.sink = _oldSink;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _services.dispose());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _services.dispose();
+      if (_rootWasListening) _rootStt.start();
+    });
     super.dispose();
   }
 
-  Route<dynamic> _route(RouteSettings rs) {
+  Route<dynamic>? _route(RouteSettings rs) {
+    // No researcher tools inside a participant's run (2 s title press).
+    if (rs.name == '/researcher' || rs.name == '/results') return null;
     final b = V5Spec().routes[rs.name];
     return MaterialPageRoute(
       settings: rs,
@@ -80,6 +94,7 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
   }
 
   Future<void> _finish() async {
+    final at = DateTime.now(); // stop the clock at the long-press, not after the dialog
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -92,7 +107,7 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
       ),
     );
     if (ok != true || !mounted) return;
-    s.end();
+    s.end(at: at);
     Navigator.of(context).pushReplacement(MaterialPageRoute(
       settings: const RouteSettings(name: '/iter6/eval'),
       builder: (_) => Iter6EvalPage(session: s),
@@ -102,8 +117,6 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final t = s.elapsedSec;
-    final clock = '${(t ~/ 60).toString().padLeft(2, '0')}:${(t % 60).toString().padLeft(2, '0')}';
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, _) {
@@ -118,7 +131,9 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
               onTap: (p) => s.onTap(p, size),
               child: Navigator(
                 key: _nav,
-                initialRoute: V5Routes.obrolan,
+                // Exactly one starting screen (initialRoute would also push '/'
+                // and '/v5', mounting a second chat).
+                onGenerateInitialRoutes: (_, _) => [_route(const RouteSettings(name: V5Routes.obrolan))!],
                 onGenerateRoute: _route,
                 observers: [_observer],
               ),
@@ -134,11 +149,12 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
                   borderRadius: BorderRadius.circular(20),
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    // No visible clock (avoids time pressure); the time is on the
+                    // evaluator's page. A dot shows the recording is running.
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.timer_outlined, color: Colors.white, size: 16),
+                      Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle)),
                       const SizedBox(width: 6),
-                      Text('$clock · Kartu ${s.card}${s.simulated ? ' · Simulasi' : ''}',
-                          style: const TextStyle(color: Colors.white, fontSize: 13)),
+                      Text(s.card, style: const TextStyle(color: Colors.white, fontSize: 12)),
                     ]),
                   ),
                 ),

@@ -16,16 +16,17 @@ class Iter6ResultsPage extends StatefulWidget {
 
 class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
   Future<List<Map<String, Object?>>>? _data;
-  late double _baseTime;
-  late double _baseSuccess;
+  // Iterasi 5 reference values: entered by the team (no defaults, source them).
+  double? _baseTime;
+  double? _baseSuccess;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (_data != null) return;
     final app = AppHandle.read(context);
-    _baseTime = app.settings.prefs.getDouble('i6_base_time') ?? 131;
-    _baseSuccess = app.settings.prefs.getDouble('i6_base_success') ?? 5;
+    _baseTime = app.settings.prefs.getDouble('i6_base_time');
+    _baseSuccess = app.settings.prefs.getDouble('i6_base_success');
     _reload();
   }
 
@@ -37,8 +38,8 @@ class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
   }
 
   Future<void> _editBaseline() async {
-    final time = TextEditingController(text: _baseTime.toStringAsFixed(0));
-    final succ = TextEditingController(text: _baseSuccess.toStringAsFixed(1));
+    final time = TextEditingController(text: _baseTime?.toStringAsFixed(0) ?? '');
+    final succ = TextEditingController(text: _baseSuccess?.toStringAsFixed(1) ?? '');
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -56,11 +57,11 @@ class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
     if (ok != true || !mounted) return;
     final prefs = AppHandle.read(context).settings.prefs;
     setState(() {
-      _baseTime = double.tryParse(time.text.replaceAll(',', '.')) ?? _baseTime;
-      _baseSuccess = double.tryParse(succ.text.replaceAll(',', '.')) ?? _baseSuccess;
+      _baseTime = double.tryParse(time.text.replaceAll(',', '.'));
+      _baseSuccess = double.tryParse(succ.text.replaceAll(',', '.'));
     });
-    prefs.setDouble('i6_base_time', _baseTime);
-    prefs.setDouble('i6_base_success', _baseSuccess);
+    _baseTime == null ? prefs.remove('i6_base_time') : prefs.setDouble('i6_base_time', _baseTime!);
+    _baseSuccess == null ? prefs.remove('i6_base_success') : prefs.setDouble('i6_base_success', _baseSuccess!);
   }
 
   String _csvCell(Object? v) {
@@ -69,18 +70,23 @@ class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
   }
 
   Future<void> _export(List<Map<String, Object?>> rows) async {
-    final app = StringBuffer('Partisipan,Kartu,Mode,Waktu (detik),Interaksi berhasil (0-5),I1,I2,I3,I4,I5,Ketukan,Rage click,Catatan\n');
-    final conf = StringBuffer('Partisipan,Menit,Teks penyebab,Yang terjadi,Sumber,Catatan\n');
+    // Worksheet column order first (paste-ready), extras after.
+    // SEQ and SUS stay empty: they are filled from the paper forms.
+    final app = StringBuffer('Partisipan,Kartu,Waktu (detik),Interaksi berhasil (0-5),SEQ (1-7),'
+        'SUS1,SUS2,SUS3,SUS4,SUS5,SUS6,SUS7,SUS8,SUS9,SUS10,'
+        'Mode,Dinilai,I1,I2,I3,I4,I5,Ketukan,Rage click,Catatan\n');
+    final conf = StringBuffer('Partisipan,Teks penyebab,Yang terjadi,Detik ke-,Sumber,Catatan\n');
     for (final r in rows) {
       final it = (r['interactions'] as List).cast<bool>();
       app.writeln([
-        r['participant'], r['card'], r['mode'], r['time_s'], r['success_count'],
+        r['participant'], r['card'], r['time_s'], r['success_count'], '',
+        for (var i = 0; i < 10; i++) '',
+        r['mode'], r['scored'] == true ? 'ya' : 'tidak',
         ...it.map((b) => b ? 1 : 0), r['taps'], r['rage_clicks'], r['notes'],
       ].map(_csvCell).join(','));
       for (final c in (r['confusions'] as List).cast<Map>()) {
-        final s = (c['at_s'] as num).toInt();
         conf.writeln([
-          r['participant'], '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}', c['text'], c['type'], c['source'], c['note'],
+          r['participant'], c['text'], c['type'], (c['at_s'] as num).toInt(), c['source'], c['note'],
         ].map(_csvCell).join(','));
       }
     }
@@ -104,13 +110,19 @@ class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
           final rows = snap.data!;
           if (rows.isEmpty) return const Center(child: Text('Belum ada data Uji 4.'));
           double mean(Iterable<num> xs) => xs.isEmpty ? 0 : xs.fold<double>(0, (a, b) => a + b) / xs.length;
-          final time = mean(rows.map((r) => r['time_s'] as num));
-          final succ = mean(rows.map((r) => r['success_count'] as num));
+          // Only scored, human-teller sessions are comparable with Iterasi 5;
+          // simulation runs are a pilot and reported separately.
+          final comparable = rows.where((r) => r['scored'] == true && r['mode'] == 'teller_manusia').toList();
+          final sims = rows.where((r) => r['mode'] == 'simulasi').length;
+          final unscored = rows.where((r) => r['scored'] != true).length;
+          final time = mean(comparable.map((r) => r['time_s'] as num));
+          final succ = mean(comparable.map((r) => r['success_count'] as num));
+          String base(double? v, int d) => v == null ? '– (isi ⚙)' : v.toStringAsFixed(d);
 
-          // Confusion recap: text → distinct participants.
+          // Confusion recap: text → distinct participants (comparable sessions).
           final byText = <String, Set<String>>{};
           final count = <String, int>{};
-          for (final r in rows) {
+          for (final r in comparable) {
             for (final c in (r['confusions'] as List).cast<Map>()) {
               final k = '${c['text']}';
               byText.putIfAbsent(k, () => {}).add('${r['participant']}');
@@ -128,14 +140,19 @@ class _Iter6ResultsPageState extends State<Iter6ResultsPage> {
               ]);
 
           return ListView(padding: const EdgeInsets.all(16), children: [
-            Text('n = ${rows.length} · ${rows.where((r) => r['mode'] == 'simulasi').length} simulasi', style: t.bodySmall),
+            Text('Dihitung: n = ${comparable.length} (teller manusia, sudah dinilai). '
+                'Tidak dihitung: $sims simulasi, $unscored belum dinilai.', style: t.bodySmall),
             const SizedBox(height: 8),
-            Table(columnWidths: const {0: FlexColumnWidth(2)}, children: [
-              tr(['Ukuran', 'Iterasi 5', 'Iterasi 6', 'Target'], bold: true),
-              tr(['Waktu (detik)', _baseTime.toStringAsFixed(0), time.toStringAsFixed(0), '–']),
-              tr(['Interaksi berhasil (0–5)', _baseSuccess.toStringAsFixed(1), succ.toStringAsFixed(1),
-                  succ >= _baseSuccess ? 'Tercapai' : 'Belum']),
-            ]),
+            if (comparable.isEmpty)
+              const Text('Belum ada sesi teller manusia yang sudah dinilai.')
+            else
+              Table(columnWidths: const {0: FlexColumnWidth(2)}, children: [
+                tr(['Ukuran', 'Iterasi 5', 'Iterasi 6', 'Target'], bold: true),
+                tr(['Waktu (detik)', base(_baseTime, 0), time.toStringAsFixed(0), '–']),
+                tr(['Interaksi berhasil (0–5)', base(_baseSuccess, 1), succ.toStringAsFixed(1),
+                    _baseSuccess == null ? '–' : (succ >= _baseSuccess! ? 'Tercapai' : 'Belum')]),
+              ]),
+            Text('Isi angka Iterasi 5 (khusus Teman Tuli, skenario buka rekening) lewat ⚙.', style: t.bodySmall),
             Text('SEQ dan SUS diisi di luar aplikasi.', style: t.bodySmall),
             const SizedBox(height: 20),
             Text('Rekap kebingungan', style: t.titleMedium),

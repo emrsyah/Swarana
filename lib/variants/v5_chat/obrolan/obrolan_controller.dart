@@ -169,12 +169,21 @@ class ObrolanController extends ChangeNotifier {
     );
     session.messages.add(m);
     ux.messageSent(t, c, override: source);
-    if (src != MessageSource.quickPhrase) s.stt.userReplied();
+    final scripted = s.scripted;
+    if (scripted != null && _isRepeatRequest(t)) {
+      scripted.repeatLast(); // a scripted partner repeats instead of moving on
+    } else if (src != MessageSource.quickPhrase) {
+      s.stt.userReplied();
+    }
     suggestions = const [];
     suggestState = SuggestState.hidden;
     notifyListeners();
     await speak(m);
   }
+
+  static final _repeatRe =
+      RegExp(r'ulang|ulangi|sekali lagi|tidak (dengar|jelas)|kurang jelas|pelan-pelan|^apa\??$|^hah\??$');
+  static bool _isRepeatRequest(String t) => _repeatRe.hasMatch(t.toLowerCase());
 
   Future<void> speak(ChatMessage m) async {
     m.tts = TtsState.speaking;
