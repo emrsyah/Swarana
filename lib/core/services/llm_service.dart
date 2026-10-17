@@ -40,7 +40,11 @@ class OpenRouterLlm implements LlmService {
       'Kamu adalah asisten komunikasi untuk Teman Tuli di Indonesia. '
       'Gunakan bahasa Indonesia sehari-hari yang sopan dan mudah dipahami.';
 
-  Future<String> _ask(String task, String input, {double temperature = 0.4}) async {
+  /// Call with a complete system prompt of its own (e.g. a role-play partner).
+  Future<String> askWithSystem(String system, String input, {double temperature = 0.4}) =>
+      _ask('', input, temperature: temperature, system: system);
+
+  Future<String> _ask(String task, String input, {double temperature = 0.4, String? system}) async {
     final http.Response res;
     try {
       res = await _http
@@ -57,7 +61,7 @@ class OpenRouterLlm implements LlmService {
               ..._speedOptions(Env.openRouterModel),
               'max_tokens': 300,
               'messages': [
-                {'role': 'system', 'content': '$_role\n\n$task'},
+                {'role': 'system', 'content': system ?? '$_role\n\n$task'},
                 {'role': 'user', 'content': input},
               ],
             }),

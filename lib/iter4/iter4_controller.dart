@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' show Offset, Size;
 
 import 'package:flutter/foundation.dart';
 
+import '../core/services/llm_service.dart';
 import '../core/services/storage.dart';
 
 /// Iteration-4 task test: 3 interface options × 3 short tasks, with a scripted
@@ -39,7 +41,11 @@ class I4Content {
     required this.total,
     required this.totalDigits,
     required this.drink,
+    required this.followUp,
   });
+
+  /// Cashier's follow-up when only the dish was ordered.
+  final String followUp;
 
   /// What the participant must order, as shown in the briefing.
   final String order;
@@ -53,11 +59,14 @@ class I4Content {
 
   static const sets = [
     I4Content(order: 'nasi goreng yang tidak pedas', dish: 'nasi goreng', modifier: 'pedas',
-        total: 'dua puluh lima ribu', totalDigits: 'Rp25.000', drink: 'es teh atau air putih'),
+        total: 'dua puluh lima ribu', totalDigits: 'Rp25.000', drink: 'es teh atau air putih',
+        followUp: 'Nasi gorengnya pedas atau tidak?'),
     I4Content(order: 'mie ayam tanpa sambal', dish: 'mie ayam', modifier: 'sambal',
-        total: 'delapan belas ribu', totalDigits: 'Rp18.000', drink: 'teh hangat atau jeruk'),
+        total: 'delapan belas ribu', totalDigits: 'Rp18.000', drink: 'teh hangat atau jeruk',
+        followUp: 'Mie ayamnya pakai sambal?'),
     I4Content(order: 'bakso tanpa seledri', dish: 'bakso', modifier: 'seledri',
-        total: 'tiga puluh dua ribu', totalDigits: 'Rp32.000', drink: 'es jeruk atau air mineral'),
+        total: 'tiga puluh dua ribu', totalDigits: 'Rp32.000', drink: 'es jeruk atau air mineral',
+        followUp: 'Baksonya pakai seledri?'),
   ];
 }
 
@@ -81,6 +90,12 @@ class I4TaskResult {
   final int contentIndex;
   bool completed = false;
   String outcome = 'running'; // success | wrong | gave_up | timed_out | aborted
+
+  /// The app saw the goal met (rule check or AI) and ended the task itself.
+  bool autoDetected = false;
+
+  /// Ended by the researcher (Selesai → Berhasil/Gagal).
+  bool manual = false;
   int timeMs = 0;
   int taps = 0;
   int rage = 0;
@@ -93,6 +108,8 @@ class I4TaskResult {
         'content_set': contentIndex,
         'completed': completed,
         'outcome': outcome,
+        'auto_detected': autoDetected,
+        'manual': manual,
         'time_ms': timeMs,
         'errors': errors.length,
         'error_kinds': errors,
@@ -103,7 +120,7 @@ class I4TaskResult {
 }
 
 class Iter4Controller extends ChangeNotifier {
-  Iter4Controller({required this.participantId, required this.storage}) {
+  Iter4Controller({required this.participantId, required this.storage, this.llm}) {
     final n = int.tryParse(participantId.replaceAll(RegExp(r'\D'), '')) ?? participantId.length;
     const squares = [
       [0, 1, 2],
@@ -120,6 +137,9 @@ class Iter4Controller extends ChangeNotifier {
 
   final String participantId;
   final Storage storage;
+
+  /// Cashier replies and goal check; null → rule-based replies only.
+  final OpenRouterLlm? llm;
   late final List<I4Option> order;
   late final DateTime startedAt;
 
@@ -138,6 +158,9 @@ class Iter4Controller extends ChangeNotifier {
   bool _disposed = false;
   final List<({DateTime t, Offset p})> _recent = [];
 
+  int _turn = 0; // latest participant message; older cashier replies are dropped
+
+  I4TaskResult? get current => _current;
   I4Option get option => order[optionIndex];
   I4Task get task => I4Task.values[taskIndex];
 
@@ -188,7 +211,7 @@ class Iter4Controller extends ChangeNotifier {
         await _say(id, 'Minumnya mau … (suara tidak jelas) …', garbled: true);
         if (id == _script) _repeatReady = true;
       case I4Task.recall:
-        await _say(id, 'Oh, minumnya mau ${k.drink}?');
+        await _say(id, 'Baik, pesanannya saya catat.');
         await _say(id, 'Silakan ditunggu di meja nomor tujuh ya.');
     }
   }
@@ -198,6 +221,11 @@ class Iter4Controller extends ChangeNotifier {
     if (id != _script || _disposed) return;
     final m = I4Message(me: false, text: '', partial: true, garbled: garbled);
     messages.add(m);
+    await _stream(id, m, text);
+  }
+
+  /// Shows [text] word by word in [m], like live captions.
+  Future<void> _stream(int id, I4Message m, String text) async {
     final words = text.split(' ');
     for (var i = 1; i <= words.length; i++) {
       if (id != _script || _disposed) {
@@ -238,18 +266,109 @@ class Iter4Controller extends ChangeNotifier {
     c.sends.add(t);
     _log('message_sent', {'text': t});
     final low = t.toLowerCase();
+    final bool ruleOk;
     switch (task) {
       case I4Task.reply:
-        _orderOk(low) ? _finish('success', true) : error('pesan_salah');
+        ruleOk = _orderOk(low);
+        if (!ruleOk) error('pesan_salah');
       case I4Task.repeat:
-        if (_repeatRe.hasMatch(low) && _repeatReady) {
-          _finish('success', true);
-        } else {
-          error(_repeatReady ? 'pesan_salah' : 'terlalu_cepat');
+        if (!_repeatReady) {
+          // The scripted lines are still coming; no reply, keep the script.
+          error('terlalu_cepat');
+          return;
         }
+        ruleOk = _repeatRe.hasMatch(low);
+        if (!ruleOk) error('pesan_salah');
       case I4Task.recall:
+        ruleOk = false;
         error('bertanya_ke_kasir'); // asking again instead of finding it
     }
+    _respond(c, ++_turn, low, ruleOk);
+  }
+
+  /// The cashier always answers (AI when available, rules otherwise), so the
+  /// conversation never looks stuck. If the goal is met (rule check or AI),
+  /// the task ends after the reply has been shown.
+  Future<void> _respond(I4TaskResult c, int turn, String low, bool ruleOk) async {
+    final id = ++_script; // stop any scripted line still being typed
+    final m = I4Message(me: false, text: '…', partial: true);
+    await Future<void>.delayed(const Duration(milliseconds: 500));
+    if (turn != _turn || _current != c || _disposed) return;
+    messages.add(m);
+    _notify();
+    var reply = _ruleReply(low, ruleOk);
+    var met = ruleOk;
+    if (llm != null) {
+      try {
+        final ai = await _aiTurn();
+        reply = ai.reply.isEmpty ? reply : ai.reply;
+        met = ruleOk || (ai.met && task != I4Task.recall);
+        _log('ai_turn', {'goal_met': ai.met});
+      } on Exception catch (e) {
+        _log('ai_failed', {'error': '$e'});
+      }
+    }
+    if (turn != _turn || _current != c || _disposed) {
+      messages.remove(m);
+      _notify();
+      return;
+    }
+    if (id == _script) await _stream(id, m, reply);
+    m.partial = false;
+    _notify();
+    if (!met) return;
+    c.autoDetected = true;
+    await Future<void>.delayed(const Duration(milliseconds: 1500));
+    if (_current == c && turn == _turn) _finish('success', true);
+  }
+
+  String _ruleReply(String low, bool ok) {
+    final k = content;
+    return switch (task) {
+      I4Task.reply => ok
+          ? 'Baik, ${k.order} ya.'
+          : low.contains(k.dish)
+              ? k.followUp
+              : 'Maaf, mau pesan apa?',
+      I4Task.repeat => ok ? 'Oh maaf. Minumnya mau ${k.drink}?' : 'Iya? Minumnya mau apa?',
+      I4Task.recall => 'Tadi sudah saya sebutkan ya, coba dicek lagi.',
+    };
+  }
+
+  String get _goal {
+    final k = content;
+    return switch (task) {
+      I4Task.reply => 'Pelanggan harus memesan ${k.order}. Tercapai hanya bila pelanggan jelas '
+          'menyebut ${k.dish} DAN bahwa ia tidak mau ${k.modifier}. Jika baru menyebut ${k.dish} saja, '
+          'tanyakan: "${k.followUp}". Jika tercapai, konfirmasi pesanannya. '
+          'Jangan menyebut harga.',
+      I4Task.repeat => 'Ucapan terakhirmu tadi tidak jelas terdengar. Pelanggan harus meminta kamu '
+          'mengulang (misalnya "bisa ulangi?", "maaf?", "apa?", "tidak jelas"). Tercapai bila pelanggan '
+          'meminta diulang; lalu ulangi dengan jelas: "Minumnya mau ${k.drink}?". '
+          'Jika pelanggan menjawab hal lain, jawab singkat lalu tanyakan lagi minumnya mau apa.',
+      I4Task.recall => 'Pelanggan seharusnya mencari sendiri total harga di aplikasinya. '
+          'Jika ia menanyakan total, jawab: "Tadi sudah saya sebutkan ya, coba dicek lagi." '
+          'Jangan menyebut angka total. Tercapai selalu false.',
+    };
+  }
+
+  Future<({String reply, bool met})> _aiTurn() async {
+    final k = content;
+    final system = 'Kamu berperan sebagai kasir warung makan di Indonesia dalam uji coba aplikasi. '
+        'Pelanggan adalah Teman Tuli yang mengetik pesan lewat aplikasi. Balas seperti kasir sungguhan: '
+        'ramah, bahasa sehari-hari, maksimal 12 kata.\n'
+        'Fakta: pesanan ${k.dish}, total harga ${k.total}, pilihan minum ${k.drink}, meja nomor tujuh.\n'
+        'Tugas pelanggan: $_goal\n'
+        'Jawab HANYA dengan JSON satu baris: {"balasan": "...", "tercapai": true/false}.';
+    final convo = messages
+        .where((m) => !m.partial && m.text.isNotEmpty)
+        .map((m) => '${m.me ? 'Pelanggan' : 'Kasir'}: ${m.garbled ? 'Minumnya mau … (tidak jelas)' : m.text}')
+        .join('\n');
+    final out = await llm!.askWithSystem(system, 'Percakapan:\n$convo', temperature: 0.3);
+    final js = RegExp(r'\{[\s\S]*\}').firstMatch(out)?.group(0);
+    if (js == null) throw LlmException('no json');
+    final j = jsonDecode(js) as Map<String, dynamic>;
+    return (reply: '${j['balasan'] ?? ''}'.trim(), met: j['tercapai'] == true);
   }
 
   /// Replay of a spoken message (allowed, not an error).
@@ -274,17 +393,22 @@ class Iter4Controller extends ChangeNotifier {
 
   void track(String event) => _log(event, {});
 
-  /// T3: participant says they found the answer → researcher marks it.
-  void foundAnswer() {
-    if (!running || task != I4Task.recall) return;
+  /// Stops the clock and asks the researcher to judge the task: used for T3
+  /// ("Sudah ketemu") and whenever the researcher ends a task by hand.
+  void endManually() {
+    if (!running) return;
+    _turn++; // drop any pending cashier reply / auto-finish
+    _script++;
     _stopClock();
+    _current!.manual = true;
     phase = I4Phase.mark;
+    _log('task_end_manual', {});
     _notify();
   }
 
   void markAnswer(bool correct) {
     if (phase != I4Phase.mark) return;
-    if (!correct) _current!.errors.add('jawaban_salah');
+    if (!correct) _current!.errors.add(task == I4Task.recall ? 'jawaban_salah' : 'tujuan_tidak_tercapai');
     _record(correct ? 'success' : 'wrong', correct);
   }
 

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../core/env.dart';
+import '../core/services/llm_service.dart';
 import '../core/services/storage.dart';
 import 'iter4_controller.dart';
 import 'iter4_options.dart';
@@ -44,7 +46,11 @@ class Iter4SessionPage extends StatefulWidget {
 }
 
 class _Iter4SessionPageState extends State<Iter4SessionPage> {
-  late final c = Iter4Controller(participantId: widget.participantId, storage: widget.storage);
+  late final c = Iter4Controller(
+    participantId: widget.participantId,
+    storage: widget.storage,
+    llm: Env.hasLlm ? OpenRouterLlm() : null,
+  );
   Timer? _tick;
 
   @override
@@ -104,11 +110,20 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
                 child: Text('${c.task.id} · $clock', style: const TextStyle(color: Colors.white)),
               ),
             ),
-            if (c.task == I4Task.recall)
-              TextButton(
-                onPressed: c.foundAnswer,
-                child: const Text('Sudah ketemu', style: TextStyle(color: Colors.white)),
-              ),
+            // Re-open the task instruction at any time.
+            IconButton(
+              tooltip: 'Lihat tugas',
+              visualDensity: VisualDensity.compact,
+              onPressed: _showTask,
+              icon: const Icon(Icons.help_outline, color: Colors.white, size: 20),
+            ),
+            // T3: participant says they found it. T1/T2: the researcher ends
+            // the task when the goal is reached; both go to Berhasil/Gagal.
+            TextButton(
+              onPressed: c.endManually,
+              child: Text(c.task == I4Task.recall ? 'Sudah ketemu' : 'Selesai',
+                  style: const TextStyle(color: Colors.white)),
+            ),
             // Long-press so an accidental tap can't end the task.
             TextButton(
               onPressed: () => ScaffoldMessenger.of(context).showSnackBar(
@@ -121,6 +136,24 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
       ),
     );
   }
+
+  void _showTask() {
+    c.track('task_instruction_opened');
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Tugas ${c.taskIndex + 1}: ${c.task.title}'),
+        content: Text(c.instruction, style: Theme.of(ctx).textTheme.bodyLarge),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Tutup'))],
+      ),
+    );
+  }
+
+  String get _markQuestion => switch (c.task) {
+        I4Task.reply => 'Pesanan "${c.content.order}" tersampaikan ke kasir?',
+        I4Task.repeat => 'Partisipan meminta kasir mengulang ucapan yang tidak jelas?',
+        I4Task.recall => 'Partisipan menjawab "${c.content.total}" (${c.content.totalDigits})?',
+      };
 
   Future<void> _confirmAbort() async {
     final ok = await showDialog<bool>(
@@ -157,18 +190,18 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
       I4Phase.mark => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Text('Untuk peneliti', style: t.labelLarge),
           const SizedBox(height: 8),
-          Text('Partisipan menjawab "${c.content.total}" (${c.content.totalDigits})?', style: t.titleLarge),
+          Text(_markQuestion, style: t.titleLarge),
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () => c.markAnswer(true),
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            child: const Text('Benar'),
+            child: Text(c.task == I4Task.recall ? 'Benar' : 'Berhasil'),
           ),
           const SizedBox(height: 8),
           OutlinedButton(
             onPressed: () => c.markAnswer(false),
             style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-            child: const Text('Salah'),
+            child: Text(c.task == I4Task.recall ? 'Salah' : 'Gagal'),
           ),
         ]),
       I4Phase.between => Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
