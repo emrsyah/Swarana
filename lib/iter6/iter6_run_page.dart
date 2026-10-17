@@ -62,9 +62,8 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     _sttSub = _services.stt.events.where((e) => e.isFinal).listen((e) {
       s.partnerLine(e.text);
       // Simulation: the question appears as soon as the news has played.
-      if (_newsPhase && s.simulated && e.text == newsText) {
-        Future<void>.delayed(const Duration(milliseconds: 800), _askNews);
-      }
+      // After a reading pause, not instantly.
+      if (_newsPhase && s.simulated && e.text == newsText) _startCountdown();
     });
     _services.stt.status.addListener(_onSttStatus);
     s.start();
@@ -74,6 +73,31 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
   bool _newsPhase = true;
   bool _askingNews = false;
   bool _pendingRepeat = false;
+  final _clearNews = ValueNotifier(0);
+
+  // Reading pause after the news before the question opens.
+  static const _readSeconds = 10;
+  int? _countdown;
+  Timer? _countdownTimer;
+
+  void _startCountdown() {
+    _countdownTimer?.cancel();
+    setState(() => _countdown = _readSeconds);
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return t.cancel();
+      if (_countdown! <= 1) {
+        _stopCountdown();
+        _askNews();
+      } else {
+        setState(() => _countdown = _countdown! - 1);
+      }
+    });
+  }
+
+  void _stopCountdown() {
+    _countdownTimer?.cancel();
+    if (mounted && _countdown != null) setState(() => _countdown = null);
+  }
 
   /// A repeat asked while the transcript was stopped plays once it records again.
   void _onSttStatus() {
@@ -85,6 +109,7 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
 
   Future<void> _askNews() async {
     if (!_newsPhase || _askingNews || !mounted) return;
+    _stopCountdown();
     _askingNews = true;
     final ctl = TextEditingController();
     final r = await showDialog<String>(
@@ -125,6 +150,7 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     if (r == null || !mounted) return;
     if (r == '__ulangi') {
       s.repeatNews();
+      _clearNews.value++; // the replay starts on a clean page
       if (!s.simulated) {
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Minta evaluator memutar ulang rekaman.')));
@@ -156,6 +182,8 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
   @override
   void dispose() {
     _sttSub?.cancel();
+    _countdownTimer?.cancel();
+    _clearNews.dispose();
     _services.stt.status.removeListener(_onSttStatus);
     _ux.sink = _oldSink;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -169,7 +197,8 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     // No researcher tools inside a participant's run (2 s title press).
     if (rs.name == '/researcher' || rs.name == '/results') return null;
     if (rs.name == V5Routes.transkrip && _newsPhase) {
-      return MaterialPageRoute(settings: rs, builder: (_) => TranskripPage(onStopped: (_) => _askNews()));
+      return MaterialPageRoute(
+          settings: rs, builder: (_) => TranskripPage(onStopped: (_) => _askNews(), clearSignal: _clearNews));
     }
     final b = V5Spec().routes[rs.name];
     return MaterialPageRoute(
@@ -230,6 +259,31 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
                 observers: [_observer],
               ),
             ),
+            // Reading pause after the news: shows when the question will open.
+            if (_countdown != null)
+              Positioned(
+                left: 16,
+                right: 16,
+                top: MediaQuery.paddingOf(context).top + 76,
+                child: Material(
+                  color: const Color(0xFF1F2937),
+                  borderRadius: BorderRadius.circular(14),
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+                    child: Row(children: [
+                      Expanded(
+                        child: Text('Baca dulu. Pertanyaan muncul dalam $_countdown detik',
+                            style: const TextStyle(color: Colors.white, fontSize: 15)),
+                      ),
+                      TextButton(
+                        onPressed: _askNews,
+                        child: const Text('Jawab sekarang', style: TextStyle(color: Colors.white)),
+                      ),
+                    ]),
+                  ),
+                ),
+              ),
             // Evaluator handle: a small red dot inside the status bar, so it
             // covers none of the app. Long-press it to finish (participant
             // can't end it by accident). No clock, to avoid time pressure.

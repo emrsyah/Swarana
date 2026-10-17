@@ -19,7 +19,10 @@ import '../widgets/text_size_slider.dart';
 
 /// One-way live captions for media, meetings, announcements.
 class TranskripPage extends StatefulWidget {
-  const TranskripPage({super.key, this.onStopped});
+  const TranskripPage({super.key, this.onStopped, this.clearSignal});
+
+  /// Test harness hook: clears the text shown so far (e.g. before a replay).
+  final Listenable? clearSignal;
 
   /// Test harness hook: replaces the save dialog when the transcript stops.
   final void Function(String text)? onStopped;
@@ -59,6 +62,7 @@ class _TranskripPageState extends State<TranskripPage> {
     _s.stt.status.addListener(_rebuild);
     _sub = _s.stt.events.listen(_onStt);
     _alertSub = _s.alerts.stream.listen((k) => setState(() => _alert = k));
+    widget.clearSignal?.addListener(_clear);
     _scroll.addListener(() {
       final f = !_scroll.hasClients || _scroll.offset >= _scroll.position.maxScrollExtent - 40;
       if (f != _following) setState(() => _following = f);
@@ -66,6 +70,15 @@ class _TranskripPageState extends State<TranskripPage> {
   }
 
   void _rebuild() => setState(() {});
+
+  void _clear() {
+    if (!mounted) return;
+    setState(() {
+      _paras.clear();
+      _partial = '';
+      if (_running) _startedAt = DateTime.now();
+    });
+  }
 
   void _onStt(SttEvent e) {
     if (!_running) return;
@@ -150,6 +163,7 @@ class _TranskripPageState extends State<TranskripPage> {
   @override
   void dispose() {
     _s.stt.status.removeListener(_rebuild);
+    widget.clearSignal?.removeListener(_clear);
     _sub?.cancel();
     _alertSub?.cancel();
     _quietTimer?.cancel();
