@@ -28,7 +28,18 @@ class _HeatmapPageState extends State<HeatmapPage> {
     '/v3/board': 'v3 · Papan bicara',
     '/v3/dengar': 'v3 · Mode dengar',
     '/v5/obrolan': 'v5 · Obrolan',
+    '/iter4/opsi1': 'Opsi 1 · Normal Chat',
+    '/iter4/opsi2': 'Opsi 2 · Dual View',
+    '/iter4/opsi3': 'Opsi 3 · Audio First',
   };
+
+  static const _variants = [
+    ('v3Board', 'v3 Board'),
+    ('v5Chat', 'v5 Chat'),
+    ('opsi1', 'Iter4 Opsi 1'),
+    ('opsi2', 'Iter4 Opsi 2'),
+    ('opsi3', 'Iter4 Opsi 3'),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -56,18 +67,17 @@ class _HeatmapPageState extends State<HeatmapPage> {
           final simulated = shown.any((e) => e['simulated'] == true);
 
           return ListView(padding: const EdgeInsets.all(16), children: [
-            SegmentedButton<String>(
-              segments: const [
-                ButtonSegment(value: 'v3Board', label: Text('v3 Board')),
-                ButtonSegment(value: 'v5Chat', label: Text('v5 Chat')),
-              ],
-              selected: {_variant},
-              showSelectedIcon: false,
-              onSelectionChanged: (s) => setState(() {
-                _variant = s.first;
-                _screen = null;
-              }),
-            ),
+            Wrap(spacing: 8, runSpacing: 4, children: [
+              for (final (v, label) in _variants)
+                ChoiceChip(
+                  label: Text(label),
+                  selected: v == _variant,
+                  onSelected: (_) => setState(() {
+                    _variant = v;
+                    _screen = null;
+                  }),
+                ),
+            ]),
             const SizedBox(height: 12),
             if (screens.isEmpty)
               const Padding(

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../core/services/alerts.dart';
 import '../core/services/services.dart';
+import '../iter4/iter4_results_page.dart';
+import '../iter4/iter4_session_page.dart';
 import '../ux_kit/simulated_data.dart';
 import '../ux_kit/ux_models.dart';
 import 'variant.dart';
@@ -130,6 +132,33 @@ class _ResearcherPanelState extends State<ResearcherPanel> {
           label: const Text('Mulai sesi uji'),
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
         ),
+        const Divider(height: 40),
+        Text('Uji tugas Iterasi 4 (3 opsi)', style: t.titleLarge),
+        const SizedBox(height: 4),
+        Text('3 tugas per opsi, lawan bicara disimulasikan. Urutan opsi dirotasi per ID.', style: t.bodySmall),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: pidOk
+                  ? () => Navigator.of(context).push(MaterialPageRoute(
+                        settings: const RouteSettings(name: '/iter4'),
+                        builder: (_) => Iter4SessionPage(participantId: _pid.text.trim(), storage: app.storage),
+                      ))
+                  : null,
+              icon: const Icon(Icons.play_arrow),
+              label: const Text('Mulai uji Iterasi 4'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => Iter4ResultsPage(storage: app.storage),
+            )),
+            child: const Text('Hasil'),
+          ),
+        ]),
+        Text('Isi ID partisipan di atas dulu.', style: t.bodySmall),
         const Divider(height: 40),
         Text('Mode bebas', style: t.titleLarge),
         const SizedBox(height: 8),
