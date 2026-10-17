@@ -155,7 +155,7 @@ class _Iter6SetupPageState extends State<Iter6SetupPage> {
         Text('Kamu nasabah yang mau buka rekening. Pakai Swarana saja untuk berkomunikasi.', style: t.bodyLarge),
         const SizedBox(height: 8),
         Text('Untuk evaluator: berikan juga kartu cetak (kartu ini hilang setelah Mulai). '
-            'Tekan Mulai tepat saat rekaman berita diputar. Saat formulir selesai, tekan lama titik merah kecil di bilah status (atas layar). '
+            'Setiap bagian diawali instruksi; teller manusia: putar rekaman berita saat partisipan menekan "Siap, mulai".Saat formulir selesai, tekan lama titik merah kecil di bilah status (atas layar). '
             'Catat kebingungan di kertas selama role-play, lalu masukkan di halaman penilaian.', style: t.bodySmall),
         const SizedBox(height: 20),
         FilledButton(

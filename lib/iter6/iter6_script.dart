@@ -97,6 +97,21 @@ class I6Card {
       );
 }
 
+/// Instruction shown before each part; the part starts when the participant
+/// is ready. Goals only, never how to use the app.
+const phaseNews = (
+  title: 'Bagian 1 dari 2 · Rekaman berita',
+  body: 'Setelah kamu menekan "Siap, mulai", rekaman berita tentang Bank Nusantara Jaya diputar. '
+      'Ikuti isinya dengan Swarana. Setelah berita selesai, kamu akan ditanya alamat kantor bank itu.',
+);
+
+const phaseTeller = (
+  title: 'Bagian 2 dari 2 · Di teller bank',
+  body: 'Sekarang kamu di depan petugas bank dan mau membuka rekening. '
+      'Jawab pertanyaan petugas dengan Swarana sampai formulir selesai ditulis. '
+      'Data dirimu ada di kartu nasabah.',
+);
+
 /// Interface texts the evaluator can pick as "Teks penyebab" (v5 labels).
 const interfaceTexts = [
   'Mendengarkan',

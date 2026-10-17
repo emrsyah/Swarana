@@ -19,7 +19,10 @@ import '../widgets/text_size_slider.dart';
 
 /// One-way live captions for media, meetings, announcements.
 class TranskripPage extends StatefulWidget {
-  const TranskripPage({super.key, this.onStopped, this.clearSignal});
+  const TranskripPage({super.key, this.onStopped, this.clearSignal, this.startSignal});
+
+  /// Test harness hook: starts recording (e.g. when the news starts playing).
+  final Listenable? startSignal;
 
   /// Test harness hook: clears the text shown so far (e.g. before a replay).
   final Listenable? clearSignal;
@@ -63,6 +66,7 @@ class _TranskripPageState extends State<TranskripPage> {
     _sub = _s.stt.events.listen(_onStt);
     _alertSub = _s.alerts.stream.listen((k) => setState(() => _alert = k));
     widget.clearSignal?.addListener(_clear);
+    widget.startSignal?.addListener(_startFromSignal);
     _scroll.addListener(() {
       final f = !_scroll.hasClients || _scroll.offset >= _scroll.position.maxScrollExtent - 40;
       if (f != _following) setState(() => _following = f);
@@ -70,6 +74,10 @@ class _TranskripPageState extends State<TranskripPage> {
   }
 
   void _rebuild() => setState(() {});
+
+  void _startFromSignal() {
+    if (mounted && !_running) _start();
+  }
 
   void _clear() {
     if (!mounted) return;
@@ -164,11 +172,13 @@ class _TranskripPageState extends State<TranskripPage> {
   void dispose() {
     _s.stt.status.removeListener(_rebuild);
     widget.clearSignal?.removeListener(_clear);
+    widget.startSignal?.removeListener(_startFromSignal);
     _sub?.cancel();
     _alertSub?.cancel();
     _quietTimer?.cancel();
-    // Only if this page is still recording: the next page may already be listening.
-    if (_running) _s.stt.stop();
+    // Only if this page is still recording and no harness manages the
+    // recognizer: the next page may already be listening.
+    if (_running && widget.onStopped == null) _s.stt.stop();
     _scroll.dispose();
     super.dispose();
   }

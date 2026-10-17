@@ -66,7 +66,27 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
       if (_newsPhase && s.simulated && e.text == newsText) _startCountdown();
     });
     _services.stt.status.addListener(_onSttStatus);
-    s.start();
+    // The clock starts when the participant is ready (first instruction).
+  }
+
+  /// Instruction shown before a part; null while the part is running.
+  ({String title, String body})? _intro = phaseNews;
+  final _startTranscript = ValueNotifier(0);
+
+  void _beginPart() {
+    if (_newsPhase) {
+      s.start(); // stopwatch: from the news starting to play
+      setState(() => _intro = null);
+      _startTranscript.value++; // the news plays into the transcript
+      return;
+    }
+    s.resume();
+    setState(() => _intro = null);
+    _nav.currentState?.pushNamedAndRemoveUntil(V5Routes.obrolan, (_) => false);
+    // Make sure Obrolan is listening after the transition settles.
+    Future<void>.delayed(const Duration(milliseconds: 900), () {
+      if (mounted && _services.stt.status.value != SttStatus.listening) _services.stt.start();
+    });
   }
 
   // Interaction 1 runs in Transkrip; the teller part (2–5) in Obrolan.
@@ -168,11 +188,9 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     _pendingRepeat = false;
     await _services.stt.stop();
     _services.scripted?.userReplied(); // teller lines follow once Obrolan listens
-    _nav.currentState?.pushNamedAndRemoveUntil(V5Routes.obrolan, (_) => false);
-    // Make sure Obrolan is listening after the transition settles.
-    Future<void>.delayed(const Duration(milliseconds: 900), () {
-      if (mounted && _services.stt.status.value != SttStatus.listening) _services.stt.start();
-    });
+    // Next part's instruction; its reading time is not task time.
+    s.pause();
+    setState(() => _intro = phaseTeller);
   }
 
   late final SttService _rootStt;
@@ -184,6 +202,7 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     _sttSub?.cancel();
     _countdownTimer?.cancel();
     _clearNews.dispose();
+    _startTranscript.dispose();
     _services.stt.status.removeListener(_onSttStatus);
     _ux.sink = _oldSink;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -198,7 +217,9 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
     if (rs.name == '/researcher' || rs.name == '/results') return null;
     if (rs.name == V5Routes.transkrip && _newsPhase) {
       return MaterialPageRoute(
-          settings: rs, builder: (_) => TranskripPage(onStopped: (_) => _askNews(), clearSignal: _clearNews));
+          settings: rs,
+          builder: (_) => TranskripPage(
+              onStopped: (_) => _askNews(), clearSignal: _clearNews, startSignal: _startTranscript));
     }
     final b = V5Spec().routes[rs.name];
     return MaterialPageRoute(
@@ -259,6 +280,37 @@ class _Iter6RunPageState extends State<Iter6RunPage> {
                 observers: [_observer],
               ),
             ),
+            // Instruction before each part: starts when the participant is ready.
+            if (_intro != null)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: Colors.black54,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                            Text(_intro!.title,
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w600, color: Colors.black87)),
+                            const SizedBox(height: 12),
+                            Text(_intro!.body, style: const TextStyle(fontSize: 18, height: 1.4, color: Colors.black87)),
+                            const SizedBox(height: 24),
+                            FilledButton(
+                              onPressed: _beginPart,
+                              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(56)),
+                              child: const Text('Siap, mulai', style: TextStyle(fontSize: 18)),
+                            ),
+                          ]),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Reading pause after the news: shows when the question will open.
             if (_countdown != null)
               Positioned(

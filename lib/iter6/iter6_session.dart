@@ -81,8 +81,34 @@ class Iter6Session implements UxEventSink {
   String notes = '';
 
   bool get running => startedAt != null && endedAt == null;
-  int get elapsedSec => startedAt == null ? 0 : (endedAt ?? DateTime.now()).difference(startedAt!).inSeconds;
-  int _sec() => DateTime.now().difference(startedAt!).inSeconds;
+
+  // Time spent reading a between-phase instruction is not task time.
+  Duration _paused = Duration.zero;
+  DateTime? _pausedSince;
+  bool get paused => _pausedSince != null;
+
+  Duration _pausedUntil(DateTime t) => _paused + (_pausedSince == null ? Duration.zero : t.difference(_pausedSince!));
+  int get elapsedSec {
+    if (startedAt == null) return 0;
+    final end = endedAt ?? DateTime.now();
+    return (end.difference(startedAt!) - _pausedUntil(end)).inSeconds;
+  }
+
+  int _sec() => (DateTime.now().difference(startedAt!) - _pausedUntil(DateTime.now())).inSeconds;
+
+  void pause() {
+    if (!running || paused) return;
+    _pausedSince = DateTime.now();
+    _log('instruction_shown', {});
+  }
+
+  void resume() {
+    final since = _pausedSince;
+    if (since == null) return;
+    _paused += DateTime.now().difference(since);
+    _pausedSince = null;
+    _log('instruction_closed', {'read_ms': DateTime.now().difference(since).inMilliseconds});
+  }
 
   void start() {
     startedAt = DateTime.now();
@@ -96,6 +122,7 @@ class Iter6Session implements UxEventSink {
   /// [at] lets the evaluator's confirmation dialog not count as task time.
   void end({DateTime? at}) {
     if (!running) return;
+    resume();
     endedAt = at ?? DateTime.now();
     _log('roleplay_ended', {'time_ms': endedAt!.difference(startedAt!).inMilliseconds});
     _proposeConfusions();
@@ -105,7 +132,7 @@ class Iter6Session implements UxEventSink {
   // ---------------- Tracking ----------------
 
   void onTap(Offset pos, Size size) {
-    if (!running) return;
+    if (!running || paused) return;
     taps++;
     final s = _sec();
     tapTimes.add(s);
@@ -194,6 +221,7 @@ class Iter6Session implements UxEventSink {
         'started_at': startedAt?.toIso8601String(),
         'ended_at': endedAt?.toIso8601String(),
         'time_s': elapsedSec,
+        'instruction_ms': _paused.inMilliseconds,
         'news_answer': newsAnswer,
         'news_answered_s': newsAnsweredSec,
         'news_repeats': newsRepeats,
