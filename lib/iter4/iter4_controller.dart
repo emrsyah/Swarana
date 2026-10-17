@@ -96,6 +96,9 @@ class I4TaskResult {
 
   /// Ended by the researcher (Selesai → Berhasil/Gagal).
   bool manual = false;
+
+  /// T3: asked the cashier for the total instead of finding it in the app.
+  bool askedCashier = false;
   int timeMs = 0;
   int taps = 0;
   int rage = 0;
@@ -110,6 +113,7 @@ class I4TaskResult {
         'outcome': outcome,
         'auto_detected': autoDetected,
         'manual': manual,
+        'asked_cashier': askedCashier,
         'time_ms': timeMs,
         'errors': errors.length,
         'error_kinds': errors,
@@ -175,7 +179,8 @@ class Iter4Controller extends ChangeNotifier {
   String get instruction => switch (task) {
         I4Task.reply => 'Pesan ${content.order} ke kasir.',
         I4Task.repeat => 'Tunggu ucapan kasir. Jika ada yang tidak jelas, minta kasir mengulang ucapannya.',
-        I4Task.recall => 'Berapa total harga yang tadi disebut kasir? Cari di aplikasi, lalu sebutkan ke peneliti.',
+        I4Task.recall => 'Berapa total harga pesananmu? Cari tahu lewat aplikasi (boleh tanya kasir), '
+            'lalu tekan "Sudah ketemu" dan sebutkan ke peneliti.',
       };
 
   void _notify() {
@@ -280,8 +285,11 @@ class Iter4Controller extends ChangeNotifier {
         ruleOk = _repeatRe.hasMatch(low);
         if (!ruleOk) error('pesan_salah');
       case I4Task.recall:
+        // Asking the cashier again is allowed (the only way in options
+        // without a history); recorded, not counted as an error.
         ruleOk = false;
-        error('bertanya_ke_kasir'); // asking again instead of finding it
+        if (!c.askedCashier) _log('asked_cashier', {});
+        c.askedCashier = true;
     }
     _respond(c, ++_turn, low, ruleOk);
   }
@@ -331,7 +339,9 @@ class Iter4Controller extends ChangeNotifier {
               ? k.followUp
               : 'Maaf, mau pesan apa?',
       I4Task.repeat => ok ? 'Oh maaf. Minumnya mau ${k.drink}?' : 'Iya? Minumnya mau apa?',
-      I4Task.recall => 'Tadi sudah saya sebutkan ya, coba dicek lagi.',
+      I4Task.recall => RegExp(r'berapa|total|harga|bayar|semua').hasMatch(low)
+          ? 'Totalnya ${k.total} ya.'
+          : 'Iya, ada yang bisa dibantu?',
     };
   }
 
@@ -346,9 +356,9 @@ class Iter4Controller extends ChangeNotifier {
           'mengulang (misalnya "bisa ulangi?", "maaf?", "apa?", "tidak jelas"). Tercapai bila pelanggan '
           'meminta diulang; lalu ulangi dengan jelas: "Minumnya mau ${k.drink}?". '
           'Jika pelanggan menjawab hal lain, jawab singkat lalu tanyakan lagi minumnya mau apa.',
-      I4Task.recall => 'Pelanggan seharusnya mencari sendiri total harga di aplikasinya. '
-          'Jika ia menanyakan total, jawab: "Tadi sudah saya sebutkan ya, coba dicek lagi." '
-          'Jangan menyebut angka total. Tercapai selalu false.',
+      I4Task.recall => 'Pelanggan sedang mengingat total harga. Jika ia menanyakan total atau harga, '
+          'sebutkan lagi dengan jelas: "Totalnya ${k.total} ya." Pertanyaan lain jawab singkat sesuai fakta. '
+          'Tercapai selalu false.',
     };
   }
 

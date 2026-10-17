@@ -68,6 +68,12 @@ class Iter4ResultsPage extends StatelessWidget {
               ),
               const SizedBox(height: 20),
             ],
+            Text('T3: bertanya ulang ke kasir', style: t.titleMedium),
+            for (final o in I4Option.values)
+              Text('${o.label.split(' · ').last}: '
+                  '${of(o, I4Task.recall).where((r) => r['asked_cashier'] == true).length}'
+                  ' dari ${of(o, I4Task.recall).length}'),
+            const SizedBox(height: 20),
             Text('Per partisipan', style: t.titleMedium),
             for (final s in studies)
               ExpansionTile(
@@ -104,7 +110,8 @@ class Iter4ResultsPage extends StatelessWidget {
                       title: Text('${r['option']} · ${r['task']} · ${r['outcome']}'),
                       subtitle: Text('${((r['time_ms'] as num) / 1000).toStringAsFixed(1)} s · '
                           '${r['errors']} error ${(r['error_kinds'] as List).isEmpty ? '' : '(${(r['error_kinds'] as List).join(', ')})'} · '
-                          '${r['taps']} ketukan'),
+                          '${r['taps']} ketukan'
+                          '${r['asked_cashier'] == true ? ' · tanya kasir' : ''}'),
                     ),
                 ],
               ),
