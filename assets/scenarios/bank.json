@@ -1,0 +1,40 @@
+{
+  "id": "bank",
+  "title": "Buka rekening bank",
+  "complexity": "kompleks",
+  "speakers": {"s1": "Petugas bank"},
+  "forms": {
+    "A": {
+      "instruction": "Kamu ingin membuka rekening tabungan. Jawab pertanyaan petugas. Data kamu: KTP ada, setoran awal Rp100.000, kartu ATM biasa.",
+      "glossary": {"setoran awal": "Uang pertama yang dimasukkan ke rekening baru.", "nasabah": "Orang yang memakai layanan bank."},
+      "turns": [
+        {"speaker": "s1", "text": "Selamat pagi, ada yang bisa saya bantu?", "suggest": ["Saya mau buka rekening", "Saya mau tanya saldo", "Di mana antreannya?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Baik, boleh saya lihat KTP Anda?", "suggest": ["Ini KTP saya", "Perlu fotokopi?", "Sebentar, ya"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Setoran awal minimal lima puluh ribu rupiah. Anda mau setor berapa?", "suggest": ["Seratus ribu rupiah", "Lima puluh ribu saja", "Apa itu setoran awal?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Kartu ATM mau yang biasa atau yang bisa untuk belanja online?", "suggest": ["Yang biasa saja", "Yang bisa belanja online", "Apa bedanya?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Silakan tanda tangan di sini. Buku tabungan dan kartu ATM bisa diambil sekarang.", "suggest": ["Terima kasih banyak", "Di mana tanda tangannya?", "Berapa biaya bulanannya?"]},
+        {"waitForUser": true}
+      ]
+    },
+    "B": {
+      "instruction": "Kamu ingin membuka rekening tabungan untuk gaji. Jawab pertanyaan petugas. Data kamu: KTP ada, setoran awal Rp200.000, kartu ATM bisa belanja online.",
+      "glossary": {"setoran awal": "Uang pertama yang dimasukkan ke rekening baru.", "payroll": "Rekening khusus untuk menerima gaji."},
+      "turns": [
+        {"speaker": "s1", "text": "Selamat siang, silakan duduk. Ada keperluan apa?", "suggest": ["Saya mau buka rekening", "Saya mau ganti kartu", "Di mana antreannya?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Untuk rekening gaji atau tabungan biasa? Saya perlu KTP Anda juga.", "suggest": ["Untuk gaji, ini KTP saya", "Tabungan biasa", "Apa bedanya?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Setoran awal rekening payroll minimal seratus ribu rupiah. Mau setor berapa?", "suggest": ["Dua ratus ribu rupiah", "Seratus ribu saja", "Apa itu payroll?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Kartunya mau yang biasa atau yang bisa belanja online?", "suggest": ["Yang bisa belanja online", "Yang biasa saja", "Apa bedanya?"]},
+        {"waitForUser": true},
+        {"speaker": "s1", "text": "Sudah selesai. Tolong tanda tangan di formulir ini, lalu kartunya saya berikan.", "suggest": ["Terima kasih banyak", "Di mana tanda tangannya?", "Berapa biaya bulanannya?"]},
+        {"waitForUser": true}
+      ]
+    }
+  }
+}

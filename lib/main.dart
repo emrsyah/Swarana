@@ -1,33 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_portal/flutter_portal.dart';
-import 'package:hexcolor/hexcolor.dart';
-import 'core/widgets/main_wrapper.dart';
-import 'features/transkrip/presentation/pages/transkrip_page.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-void main() {
-  initializeDateFormatting('id_ID', null).then((_) {
-    runApp(const MyApp());
-  });
-}
+import 'app.dart';
+import 'core/models/scenario.dart';
+import 'core/services/storage.dart';
+import 'core/settings.dart';
+import 'ux_kit/ux_controller.dart';
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+const _scenarioIds = ['warung', 'bank', 'cs'];
 
-  @override
-  Widget build(BuildContext context) {
-    return Portal(
-      child: MaterialApp(
-        title: 'Swarana',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: HexColor('#3C37AF')),
-          scaffoldBackgroundColor: Colors.white, // Global background color
-          useMaterial3: true,
-          fontFamily: 'PlusJakartaSans',
-        ),
-        home: const MainWrapper(),
-        routes: {'/transkrip': (context) => const TranskripPage()},
-      ),
-    );
-  }
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initializeDateFormatting('id_ID');
+  final prefs = await SharedPreferences.getInstance();
+  final storage = Storage();
+  await storage.init();
+  final scenarios = {
+    for (final id in _scenarioIds)
+      id: Scenario.parse(await rootBundle.loadString('assets/scenarios/$id.json')),
+  };
+  runApp(SwaranaApp(
+    storage: storage,
+    settings: AppSettings(prefs),
+    ux: UxController(),
+    scenarios: scenarios,
+  ));
 }
