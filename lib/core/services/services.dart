@@ -1,6 +1,5 @@
 import 'package:flutter/widgets.dart';
 
-import '../env.dart';
 import '../models/scenario.dart';
 import '../settings.dart';
 import 'alerts.dart';
@@ -48,9 +47,7 @@ class Services {
     final SttService stt = scripted ?? LiveSttService();
     final LlmService llm = scripted != null
         ? ScriptedLlm(stt: scripted, glossary: form!.glossary)
-        : Env.hasLlm
-            ? OpenRouterLlm()
-            : ScriptedLlm.generic();
+        : liveLlm() ?? ScriptedLlm.generic();
     final tts = TtsService(alerts: alerts, haptics: haptics)..stt = stt;
     tts.init();
     return Services._(

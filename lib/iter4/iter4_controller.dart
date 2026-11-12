@@ -154,7 +154,7 @@ class Iter4Controller extends ChangeNotifier {
   final Storage storage;
 
   /// Cashier replies and goal check; null → rule-based replies only.
-  final OpenRouterLlm? llm;
+  final PromptLlm? llm;
   late final List<I4Option> order;
   late final DateTime startedAt;
 

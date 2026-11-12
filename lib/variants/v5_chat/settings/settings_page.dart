@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/local_gemma.dart';
 import '../../../core/services/services.dart';
 import '../copy.dart';
 import '../design/tokens.dart';
@@ -67,6 +68,8 @@ class SettingsPage extends StatelessWidget {
             TextSizeSlider(value: st.textScale),
           ]),
         ),
+        _Header('AI'),
+        const _LocalModelTile(),
         _Header('Privasi'),
         const ListTile(
           leading: Icon(Icons.lock_outline),
@@ -81,6 +84,59 @@ class SettingsPage extends StatelessWidget {
           onTap: () => Navigator.of(context).pushNamed(V5Routes.onboarding),
         ),
       ]),
+    );
+  }
+}
+
+/// Download / status of the on-device Gemma model. Takes effect for new
+/// conversations (the AI backend is chosen when a session starts).
+class _LocalModelTile extends StatelessWidget {
+  const _LocalModelTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final g = LocalGemma.instance;
+    return ValueListenableBuilder<LocalGemmaStatus>(
+      valueListenable: g.status,
+      builder: (context, s, _) => switch (s) {
+        LocalGemmaStatus.unsupported => const ListTile(
+            leading: Icon(Icons.memory),
+            title: Text('AI di ponsel'),
+            subtitle: Text('Hanya tersedia di Android.'),
+          ),
+        LocalGemmaStatus.absent || LocalGemmaStatus.error => ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('Unduh AI di ponsel (Gemma)'),
+            subtitle: Text(
+              s == LocalGemmaStatus.error
+                  ? 'Gagal: ${g.lastError ?? 'tidak diketahui'}. Ketuk untuk coba lagi.'
+                  : 'Saran AI jalan tanpa internet dan percakapan tidak keluar dari ponsel. '
+                      'Ukuran ${LocalGemma.sizeLabel}, sebaiknya pakai Wi-Fi.',
+            ),
+            onTap: g.download,
+          ),
+        LocalGemmaStatus.downloading => ValueListenableBuilder<int>(
+            valueListenable: g.progress,
+            builder: (_, p, _) => ListTile(
+              leading: const Icon(Icons.downloading),
+              title: Text('Mengunduh AI… $p%'),
+              subtitle: Padding(
+                padding: const EdgeInsets.only(top: V5Space.xs),
+                child: LinearProgressIndicator(value: p / 100),
+              ),
+            ),
+          ),
+        LocalGemmaStatus.loading => const ListTile(
+            leading: SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+            title: Text('Menyiapkan AI di ponsel…'),
+          ),
+        LocalGemmaStatus.ready => ListTile(
+            leading: const Icon(Icons.check_circle_outline, color: V5Colors.success),
+            title: const Text('AI di ponsel aktif'),
+            subtitle: const Text('Dipakai untuk obrolan baru. Tahan untuk menghapus model.'),
+            onLongPress: g.delete,
+          ),
+      },
     );
   }
 }
