@@ -29,13 +29,34 @@ abstract class LlmService {
   Future<String> titleFor(String text);
 }
 
-/// The real AI backend for live use: on-device Gemma once downloaded,
-/// otherwise OpenRouter when a key was built in, otherwise null.
-PromptLlm? liveLlm() => LocalGemma.instance.isReady
-    ? LocalGemmaLlm()
-    : Env.hasLlm
-        ? OpenRouterLlm()
-        : null;
+/// The real AI backend for live use: OpenRouter when a key was built in,
+/// falling back per call to on-device Gemma (offline, errors, timeouts).
+/// Null when neither is available, so callers use canned answers.
+PromptLlm? liveLlm() {
+  if (!Env.hasLlm) return LocalGemma.instance.isReady ? LocalGemmaLlm() : null;
+  return FallbackLlm([OpenRouterLlm(), LocalGemmaLlm()]);
+}
+
+/// Tries each backend in order and returns the first answer. A backend that
+/// is not ready (e.g. Gemma not downloaded) fails fast and is skipped.
+class FallbackLlm extends PromptLlm {
+  FallbackLlm(this.chain) : assert(chain.isNotEmpty);
+  final List<PromptLlm> chain;
+
+  @override
+  Future<String> complete(String system, String input, {double temperature = 0.4}) async {
+    final errors = <String>[];
+    for (final llm in chain) {
+      try {
+        return await llm.complete(system, input, temperature: temperature);
+      } on Exception catch (e) {
+        // Also catches malformed bodies (FormatException), not just LlmException.
+        errors.add('$e');
+      }
+    }
+    throw LlmException(errors.join('; '));
+  }
+}
 
 /// Shared prompts, so every backend gets the same instructions. Prompts follow
 /// the Role / User context / Task / Constraint framework adopted in

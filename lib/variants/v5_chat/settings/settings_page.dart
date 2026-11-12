@@ -117,7 +117,7 @@ class _LocalModelTile extends StatelessWidget {
             subtitle: Text(
               s == LocalGemmaStatus.error
                   ? 'Gagal: ${g.lastError ?? 'tidak diketahui'}. Ketuk untuk coba lagi.'
-                  : 'Saran AI jalan tanpa internet dan percakapan tidak keluar dari ponsel. '
+                  : 'Agar saran AI tetap jalan saat tidak ada internet. '
                       'Ukuran ${LocalGemma.sizeLabel}, sebaiknya pakai Wi-Fi.',
             ),
             onTap: g.download,
@@ -140,7 +140,7 @@ class _LocalModelTile extends StatelessWidget {
         LocalGemmaStatus.ready => ListTile(
             leading: const Icon(Icons.check_circle_outline, color: V5Colors.success),
             title: const Text('AI di ponsel aktif'),
-            subtitle: const Text('Dipakai untuk obrolan baru. Tahan untuk menghapus model.'),
+            subtitle: const Text('Dipakai saat tidak ada internet. Tahan untuk menghapus model.'),
             onLongPress: g.delete,
           ),
       },
