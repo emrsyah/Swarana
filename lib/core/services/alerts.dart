@@ -16,12 +16,16 @@ class Alerts {
 
   Stream<AlertKind> get stream => _ctrl.stream;
 
+  /// Shown as a banner only, no vibration: they come from background work
+  /// (AI suggestions failing, talking while paused) and can repeat often.
+  static const _silent = {AlertKind.offline, AlertKind.speechWhilePaused};
+
   void raise(AlertKind kind) {
-    // Avoid buzzing repeatedly for the same condition.
+    // Avoid repeating the same condition.
     final prev = _last[kind];
-    if (prev != null && DateTime.now().difference(prev) < const Duration(seconds: 8)) return;
+    if (prev != null && DateTime.now().difference(prev) < const Duration(seconds: 60)) return;
     _last[kind] = DateTime.now();
-    _haptics.alert();
+    if (!_silent.contains(kind)) _haptics.alert();
     _ctrl.add(kind);
   }
 }
