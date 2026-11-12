@@ -32,9 +32,23 @@ class _VoiceLabPageState extends State<VoiceLabPage> {
         ],
       ),
       body: Column(children: [
-        if (!LocalGemma.instance.hearsAudio)
-          const _Banner('AI di ponsel belum aktif atau modelnya tidak menerima audio. '
-              'Pembicara tetap dideteksi, tapi tulisan tidak muncul.'),
+        ValueListenableBuilder<LocalGemmaStatus>(
+          valueListenable: LocalGemma.instance.status,
+          builder: (_, s, _) {
+            final g = LocalGemma.instance;
+            final why = switch (s) {
+              _ when g.hearsAudio => null,
+              LocalGemmaStatus.ready => 'AI di ponsel aktif, tapi bagian audionya gagal dimuat: '
+                  '${g.audioError ?? 'tidak diketahui'}',
+              LocalGemmaStatus.loading => 'AI di ponsel sedang disiapkan…',
+              LocalGemmaStatus.downloading || LocalGemmaStatus.importing => 'Model AI masih diunduh/disalin.',
+              LocalGemmaStatus.error => 'AI di ponsel gagal: ${g.lastError ?? 'tidak diketahui'}',
+              LocalGemmaStatus.unsupported => 'AI di ponsel hanya ada di Android.',
+              LocalGemmaStatus.absent => 'Model AI belum diunduh. Unduh atau impor dulu di Pengaturan.',
+            };
+            return why == null ? const SizedBox.shrink() : _Banner('$why Pembicara tetap dideteksi, tapi tulisan tidak muncul.');
+          },
+        ),
         ValueListenableBuilder<double>(
           valueListenable: lab.threshold,
           builder: (_, t, _) => ListTile(

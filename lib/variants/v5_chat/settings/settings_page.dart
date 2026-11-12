@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/services/local_gemma.dart';
@@ -95,14 +96,42 @@ class SettingsPage extends StatelessWidget {
   }
 }
 
-/// Download / status of the on-device Gemma model. Takes effect for new
-/// conversations (the AI backend is chosen when a session starts).
+/// Download / import / status of the on-device Gemma model.
 class _LocalModelTile extends StatelessWidget {
   const _LocalModelTile();
+
+  /// Pick a .litertlm the user fetched with the browser or a download
+  /// manager (much faster than the plugin's single-connection download).
+  static Future<void> _import(BuildContext context) async {
+    final files = await FilePicker.pickFiles();
+    if (files.isEmpty) return;
+    final f = files.first;
+    if (f.extension != 'litertlm') {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Pilih file ${LocalGemma.fileName}')));
+      }
+      return;
+    }
+    await LocalGemma.instance.importFrom(f.readAsByteStream(), f.lengthSync() ?? await f.length() ?? 0);
+  }
 
   @override
   Widget build(BuildContext context) {
     final g = LocalGemma.instance;
+    final importTile = ListTile(
+      leading: const Icon(Icons.file_open_outlined),
+      title: const Text('Sudah punya file modelnya?'),
+      subtitle: const Text(
+        'Lebih cepat: unduh ${LocalGemma.fileName} lewat browser atau aplikasi pengunduh '
+        '(tautan di bawah), lalu ketuk di sini untuk memilih file itu.',
+      ),
+      onTap: () => _import(context),
+    );
+    const linkTile = Padding(
+      padding: EdgeInsets.fromLTRB(V5Space.lg, 0, V5Space.lg, V5Space.sm),
+      child: SelectableText(LocalGemma.url, style: TextStyle(fontSize: 12, color: V5Colors.muted)),
+    );
     return ValueListenableBuilder<LocalGemmaStatus>(
       valueListenable: g.status,
       builder: (context, s, _) => switch (s) {
@@ -111,28 +140,36 @@ class _LocalModelTile extends StatelessWidget {
             title: Text('AI di ponsel'),
             subtitle: Text('Hanya tersedia di Android.'),
           ),
-        LocalGemmaStatus.absent || LocalGemmaStatus.error => ListTile(
-            leading: const Icon(Icons.download_outlined),
-            title: const Text('Unduh AI di ponsel (Gemma)'),
-            subtitle: Text(
-              s == LocalGemmaStatus.error
-                  ? 'Gagal: ${g.lastError ?? 'tidak diketahui'}. Ketuk untuk coba lagi.'
-                  : 'Agar saran AI tetap jalan saat tidak ada internet. '
-                      'Ukuran ${LocalGemma.sizeLabel}, sebaiknya pakai Wi-Fi.',
+        LocalGemmaStatus.absent || LocalGemmaStatus.error => Column(children: [
+            ListTile(
+              leading: const Icon(Icons.download_outlined),
+              title: const Text('Unduh AI di ponsel (Gemma)'),
+              subtitle: Text(
+                s == LocalGemmaStatus.error
+                    ? 'Gagal: ${g.lastError ?? 'tidak diketahui'}. Ketuk untuk coba lagi.'
+                    : 'Agar saran AI tetap jalan saat tidak ada internet. '
+                        'Ukuran ${LocalGemma.sizeLabel}, sebaiknya pakai Wi-Fi.',
+              ),
+              onTap: g.download,
             ),
-            onTap: g.download,
-          ),
-        LocalGemmaStatus.downloading => ValueListenableBuilder<int>(
-            valueListenable: g.progress,
-            builder: (_, p, _) => ListTile(
-              leading: const Icon(Icons.downloading),
-              title: Text('Mengunduh AI… $p%'),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: V5Space.xs),
-                child: LinearProgressIndicator(value: p / 100),
+            importTile,
+            linkTile,
+          ]),
+        LocalGemmaStatus.downloading || LocalGemmaStatus.importing => Column(children: [
+            ValueListenableBuilder<int>(
+              valueListenable: g.progress,
+              builder: (_, p, _) => ListTile(
+                leading: const Icon(Icons.downloading),
+                title: Text('${s == LocalGemmaStatus.importing ? 'Menyalin file model' : 'Mengunduh AI'}… $p%'),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: V5Space.xs),
+                  child: LinearProgressIndicator(value: p / 100),
+                ),
               ),
             ),
-          ),
+            // A slow in-app download can be swapped for a faster external one.
+            if (s == LocalGemmaStatus.downloading) ...[importTile, linkTile],
+          ]),
         LocalGemmaStatus.loading => const ListTile(
             leading: SizedBox.square(dimension: 24, child: CircularProgressIndicator(strokeWidth: 2)),
             title: Text('Menyiapkan AI di ponsel…'),
@@ -140,7 +177,9 @@ class _LocalModelTile extends StatelessWidget {
         LocalGemmaStatus.ready => ListTile(
             leading: const Icon(Icons.check_circle_outline, color: V5Colors.success),
             title: const Text('AI di ponsel aktif'),
-            subtitle: const Text('Dipakai saat tidak ada internet. Tahan untuk menghapus model.'),
+            subtitle: Text('Dipakai saat tidak ada internet.'
+                '${g.hearsAudio ? '' : ' Audio tidak aktif: ${g.audioError ?? 'tidak diketahui'}.'}'
+                ' Tahan untuk menghapus model.'),
             onLongPress: g.delete,
           ),
       },
