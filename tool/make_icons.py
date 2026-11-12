@@ -1,6 +1,7 @@
 """Regenerate the app icon and splash images from assets/v5/logo.png.
 
-    python tool/make_icons.py && dart run flutter_native_splash:create
+    python tool/make_icons.py
+    dart pub global activate flutter_native_splash && dart pub global run flutter_native_splash:create
 
 Writes:
   assets/v5/icon_fg.png        adaptive foreground (also the Android 12 splash icon)

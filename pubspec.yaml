@@ -65,10 +65,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  flutter_native_splash: ^2.2.16
 
-# Regenerate icon + splash after changing assets/v5/logo.png:
-#   python tool/make_icons.py && dart run flutter_native_splash:create
+# Icon + native splash are generated files, committed. To regenerate after
+# changing assets/v5/logo.png (the splash tool is not a dependency: the
+# version pub resolves breaks the Android build):
+#   python tool/make_icons.py
+#   dart pub global activate flutter_native_splash && dart pub global run flutter_native_splash:create
 flutter_native_splash:
   color: "#1F4FFF"
   image: assets/v5/splash_logo.png
