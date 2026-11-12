@@ -7,6 +7,10 @@ AAC app for Teman Tuli (GEMASTIK XIX, UX design). One Flutter app holds two vari
 
 Both run on the same shared services (`lib/core/`), so the A/B compares the interface, not the engine.
 
+## Download
+
+**[⬇ Download swarana.apk](https://github.com/emrsyah/swarana/releases/latest/download/swarana.apk)** (Android 9+). Rebuilt automatically on every push; open the file on the phone and allow "install unknown apps". If an update refuses to install, uninstall the old one first.
+
 ## Run
 
 ```bash
