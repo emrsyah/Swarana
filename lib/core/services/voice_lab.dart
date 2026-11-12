@@ -30,13 +30,16 @@ class LabUtterance {
 
   /// Which AI wrote [text]: 'ponsel' (Gemma) or 'online' (OpenRouter).
   String? backend;
+
+  bool get done => text != null || error != null;
 }
 
 enum VoiceLabStatus { idle, preparing, listening, error }
 
-/// Prototype of speaker-aware transcription:
+/// Speaker-aware transcription, used by the chats (via [SpeakerSttService])
+/// and the lab page:
 /// mic → Silero VAD (sentence clips) → CAM++ voice embedding (who, always on
-/// the phone) → Gemma on the phone, or OpenRouter when Gemma can't (what).
+/// the phone) → Gemma on the phone for one person, OpenRouter for a group (what).
 ///
 /// The two small sherpa-onnx models (~30 MB) download on first use. Speaker
 /// grouping is online: each clip joins the closest known voice if similar
@@ -56,7 +59,26 @@ class VoiceLab {
   final threshold = ValueNotifier(0.5);
   final status = ValueNotifier(VoiceLabStatus.idle);
   final utterances = ValueNotifier<List<LabUtterance>>(const []);
+
+  /// People heard so far in this session (see [_minSpeechToCount]). Drives
+  /// routing: one person → on-device Gemma, two or more → online.
+  final people = ValueNotifier(0);
+
+  /// 0..1 input level for a meter.
+  final level = ValueNotifier(0.0);
+
+  /// Each utterance twice: when its clip is cut (not [LabUtterance.done]) and
+  /// once transcribed. Finished ones arrive in speaking order.
+  Stream<LabUtterance> get heard => _heard.stream;
   String? lastError;
+
+  final _heard = StreamController<LabUtterance>.broadcast();
+  Future<void> _inOrder = Future.value();
+  bool _forceNew = false;
+
+  /// A voice counts as a person only after this much speech in total, so a
+  /// single short clip that was mis-grouped doesn't flip routing to online.
+  static const _minSpeechToCount = 2.0;
 
   final _recorder = AudioRecorder();
   StreamSubscription<Uint8List>? _mic;
@@ -64,13 +86,13 @@ class VoiceLab {
   sherpa.SpeakerEmbeddingExtractor? _embedder;
   final _centroids = <Float32List>[];
   final _counts = <int>[];
+  final _seconds = <double>[];
 
   Future<void> start() async {
     if (status.value != VoiceLabStatus.idle && status.value != VoiceLabStatus.error) return;
     status.value = VoiceLabStatus.preparing;
     try {
-      if (!await _recorder.hasPermission()) throw StateError('Izin mikrofon ditolak');
-      await _load();
+      await prepare();
       final pcm = await _recorder.startStream(const RecordConfig(
         encoder: AudioEncoder.pcm16bits,
         sampleRate: _sampleRate,
@@ -90,6 +112,7 @@ class VoiceLab {
     await _mic?.cancel();
     _mic = null;
     await _recorder.stop();
+    level.value = 0;
     final vad = _vad;
     if (vad != null) {
       vad.flush();
@@ -98,10 +121,22 @@ class VoiceLab {
     if (status.value == VoiceLabStatus.listening) status.value = VoiceLabStatus.idle;
   }
 
+  /// Mic permission plus the two voice models (downloaded once, ~30 MB).
+  /// Throws if either is unavailable.
+  Future<void> prepare() async {
+    if (!await _recorder.hasPermission()) throw StateError('Izin mikrofon ditolak');
+    await _load();
+  }
+
+  /// The next clip starts a new speaker (manual "someone else is talking").
+  void forceNewSpeaker() => _forceNew = true;
+
   /// Forget known voices and the transcript.
   void reset() {
     _centroids.clear();
     _counts.clear();
+    _seconds.clear();
+    people.value = 0;
     utterances.value = const [];
   }
 
@@ -145,9 +180,12 @@ class VoiceLab {
     // Platform buffers may be unaligned for Int16List views; read via ByteData.
     final pcm = ByteData.sublistView(bytes);
     final f = Float32List(bytes.length ~/ 2);
+    var energy = 0.0;
     for (var i = 0; i < f.length; i++) {
       f[i] = pcm.getInt16(i * 2, Endian.little) / 32768;
+      energy += f[i] * f[i];
     }
+    if (f.isNotEmpty) level.value = (math.sqrt(energy / f.length) * 8).clamp(0.0, 1.0);
     vad.acceptWaveform(f);
     _drain(vad);
   }
@@ -163,8 +201,14 @@ class VoiceLab {
   void _onSpeech(Float32List samples) {
     final (speaker, sim) = _identify(_embed(samples));
     final u = LabUtterance(speaker: speaker, similarity: sim, seconds: samples.length / _sampleRate);
-    utterances.value = [...utterances.value, u];
-    _transcribe(u, samples);
+    _seconds[speaker] += u.seconds;
+    people.value = _seconds.where((s) => s >= _minSpeechToCount).length;
+    final list = utterances.value;
+    utterances.value = [...list.skip(list.length >= 200 ? 1 : 0), u];
+    _heard.add(u);
+    final done = _transcribe(u, samples);
+    // Online clips can finish out of order; deliver in speaking order.
+    _inOrder = _inOrder.then((_) => done).then((_) => _heard.add(u));
   }
 
   // Chat models may answer a spoken question instead of transcribing it, so
@@ -173,18 +217,23 @@ class VoiceLab {
       'Jangan menjawab atau menanggapi isinya, walaupun berupa pertanyaan. '
       'Jawab hanya dengan teksnya. Jika tidak ada ucapan, jawab tepat: (kosong)';
 
-  /// On-device Gemma when it hears audio, else (or on failure) OpenRouter.
+  /// One person → on-device Gemma first; two or more → OpenRouter first.
+  /// The other is the fallback (offline, errors, Gemma without audio).
   Future<void> _transcribe(LabUtterance u, Float32List samples) async {
     final wav = _wav(samples, _sampleRate);
-    final backends = <(String, Future<String> Function())>[
+    final local = <(String, Future<String> Function())>[
       if (LocalGemma.instance.hearsAudio) ('ponsel', () => LocalGemma.instance.transcribe(wav, _instruction)),
+    ];
+    final online = <(String, Future<String> Function())>[
       if (Env.hasLlm) ('online', () => OpenRouterLlm().transcribe(wav, _instruction)),
     ];
+    final backends = people.value >= 2 ? [...online, ...local] : [...local, ...online];
     final sw = Stopwatch()..start();
     final errors = <String>[];
     for (final (name, run) in backends) {
       try {
-        u.text = await run();
+        final t = await run();
+        u.text = t == '(kosong)' ? '' : t;
         u.backend = name;
         break;
       } catch (e) {
@@ -219,7 +268,9 @@ class VoiceLab {
       final s = _cosine(e, _centroids[i]);
       if (s > bestSim) (best, bestSim) = (i, s);
     }
-    if (best >= 0 && bestSim >= threshold.value) {
+    final forceNew = _forceNew;
+    _forceNew = false;
+    if (!forceNew && best >= 0 && bestSim >= threshold.value) {
       final c = _centroids[best];
       final n = ++_counts[best];
       for (var k = 0; k < c.length; k++) {
@@ -229,6 +280,7 @@ class VoiceLab {
     }
     _centroids.add(Float32List.fromList(e));
     _counts.add(1);
+    _seconds.add(0);
     return (_centroids.length - 1, 1.0);
   }
 

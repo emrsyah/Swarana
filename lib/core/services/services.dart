@@ -6,6 +6,7 @@ import 'alerts.dart';
 import 'haptics.dart';
 import 'llm_service.dart';
 import 'scripted.dart';
+import 'speaker_stt.dart';
 import 'storage.dart';
 import 'stt_service.dart';
 import 'tts_service.dart';
@@ -44,7 +45,8 @@ class Services {
     final haptics = Haptics()..enabled = settings.haptics.value;
     final alerts = Alerts(haptics);
     final scripted = form == null ? null : ScriptedStt(form, onSignal: onSignal);
-    final SttService stt = scripted ?? LiveSttService();
+    // Automatic speaker detection; falls back to Android's recognizer itself.
+    final SttService stt = scripted ?? SpeakerSttService();
     final LlmService llm = scripted != null
         ? ScriptedLlm(stt: scripted, glossary: form!.glossary)
         : liveLlm() ?? ScriptedLlm.generic();

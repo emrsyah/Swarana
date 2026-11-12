@@ -66,6 +66,17 @@ class _VoiceLabPageState extends State<VoiceLabPage> {
             ),
           ),
         ),
+        ValueListenableBuilder<int>(
+          valueListenable: lab.people,
+          builder: (_, n, _) => ListTile(
+            dense: true,
+            leading: const Icon(Icons.groups_outlined),
+            title: Text(n == 0 ? 'Belum ada yang terdeteksi' : 'Terdeteksi $n orang'),
+            subtitle: Text(n >= 2
+                ? 'Lebih dari satu orang: tulisan dibuat AI online dulu.'
+                : 'Satu orang: tulisan dibuat AI di ponsel dulu.'),
+          ),
+        ),
         const Divider(height: 1),
         Expanded(
           child: ValueListenableBuilder<List<LabUtterance>>(

@@ -46,7 +46,8 @@ class SettingsPage extends StatelessWidget {
             onChanged: (x) => st.separateSpeakers.value = x,
             title: const Text('Pisahkan pembicara'),
             subtitle: const Text(
-              'Tiap orang ditampilkan dengan nama dan warna sendiri. Ketuk "Orang lain bicara" saat orang lain mulai bicara.',
+              'Tiap orang ditampilkan dengan nama dan warna sendiri, dikenali otomatis dari suaranya. '
+              'Ketuk "Orang lain bicara" jika ada yang salah dikenali.',
             ),
           ),
         ),
