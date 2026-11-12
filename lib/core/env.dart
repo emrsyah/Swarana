@@ -5,9 +5,8 @@ class Env {
     'OPENROUTER_MODEL',
     // Benchmarked on OpenRouter with the suggestion prompt (median of 3):
     // qwen3.8-27b on Cerebras 1.04 s, gemini-3.5-flash-lite 1.42 s,
-    // gemini-3.8-flash ~4 s. Now Gemma 4 (MoE, ~4B active) for speed;
-    // google/gemma-4-31b-it is the bigger dense option.
-    defaultValue: 'google/gemma-4-26b-a4b-it',
+    // gemini-3.8-flash ~4 s. Qwen kept good Indonesian at the lowest latency.
+    defaultValue: 'qwen/qwen3.8-27b',
   );
 
   static bool get hasLlm => openRouterKey.isNotEmpty;
