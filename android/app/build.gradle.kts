@@ -31,11 +31,26 @@ android {
         versionName = flutter.versionName
     }
 
+    // One fixed key for every build, so a new APK installs as an update over
+    // the previous one (CI runners otherwise sign with a fresh debug key each
+    // run and Android refuses the update). The keystore is not in git: CI
+    // restores it from the SIGNING_KEYSTORE_B64 secret; the password comes
+    // from SIGNING_PASSWORD. Without both, builds fall back to the debug key.
+    val studyKey = file("swarana-study.keystore")
+    val studyPassword = System.getenv("SIGNING_PASSWORD")
+    val hasStudyKey = studyKey.exists() && !studyPassword.isNullOrEmpty()
+    signingConfigs {
+        create("study") {
+            storeFile = studyKey
+            storePassword = studyPassword
+            keyAlias = "swarana"
+            keyPassword = studyPassword
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasStudyKey) "study" else "debug")
         }
     }
 }

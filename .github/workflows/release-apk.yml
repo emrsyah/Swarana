@@ -31,9 +31,21 @@ jobs:
 
       - run: flutter pub get
 
+      # Same signing key every run so new APKs install as updates.
+      - name: Restore signing key
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+        run: |
+          if [ -n "$SIGNING_KEYSTORE_B64" ]; then
+            echo "$SIGNING_KEYSTORE_B64" | base64 -d > android/app/swarana-study.keystore
+          else
+            echo "::warning::SIGNING_KEYSTORE_B64 not set; APK is signed with a throwaway debug key"
+          fi
+
       - name: Build release APK
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
           flutter build apk --release \
             --build-number=${{ github.run_number }} \
