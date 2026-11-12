@@ -33,7 +33,12 @@ class V5Drawer extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(V5Space.xl, V5Space.lg, V5Space.lg, V5Space.md),
             child: Row(children: [
-              const Icon(Icons.record_voice_over_rounded, color: V5Colors.primary),
+              // Logo head is white, so it sits on a blue tile (like the app icon).
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
+                decoration: BoxDecoration(color: V5Colors.primary, borderRadius: BorderRadius.circular(8)),
+                child: Image.asset('assets/v5/logo.png', height: 18, semanticLabel: 'Logo Swarana'),
+              ),
               const SizedBox(width: V5Space.sm),
               Text('Swarana', style: t.titleMedium),
             ]),

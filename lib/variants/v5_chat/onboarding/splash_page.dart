@@ -6,8 +6,7 @@ import '../../../core/services/services.dart';
 import '../design/tokens.dart';
 import '../v5_routes.dart';
 
-/// Splash (design/v5/screens/5Splash screen.png). Tagline is upright and
-/// medium weight for contrast on blue (Figma: thin italic).
+/// Splash (Figma "Splash screen"): logo, "New Swarana", italic tagline on blue.
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -35,19 +34,25 @@ class _SplashPageState extends State<SplashPage> {
   }
 
   @override
-  Widget build(BuildContext context) => const Scaffold(
+  Widget build(BuildContext context) => Scaffold(
         backgroundColor: V5Colors.primary,
         body: Center(
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(Icons.record_voice_over_rounded, color: Colors.white, size: 40),
-              SizedBox(width: V5Space.md),
-              Text('Swarana', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w500)),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: V5Space.xl),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                Image.asset('assets/v5/logo.png', height: 40, semanticLabel: 'Logo Swarana'),
+                const SizedBox(width: V5Space.md),
+                const Text('New Swarana', style: TextStyle(color: Colors.white, fontSize: 28)),
+              ]),
+              const SizedBox(height: V5Space.md),
+              const Text(
+                'Setiap Kata Bermakna, Setiap Suara Berharga',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white, fontSize: 14, fontStyle: FontStyle.italic),
+              ),
             ]),
-            SizedBox(height: V5Space.md),
-            Text('Setiap kata bermakna, setiap suara berharga',
-                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w500)),
-          ]),
+          ),
         ),
       );
 }
