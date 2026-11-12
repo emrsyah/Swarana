@@ -8,6 +8,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:record/record.dart';
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
 
+import '../env.dart';
+import 'llm_service.dart';
 import 'local_gemma.dart';
 
 /// One spoken turn heard by [VoiceLab].
@@ -21,16 +23,20 @@ class LabUtterance {
   final double similarity;
   final double seconds;
 
-  /// Null while Gemma is still transcribing.
+  /// Null while still transcribing.
   String? text;
   String? error;
   int? transcribeMs;
+
+  /// Which AI wrote [text]: 'ponsel' (Gemma) or 'online' (OpenRouter).
+  String? backend;
 }
 
 enum VoiceLabStatus { idle, preparing, listening, error }
 
-/// Prototype of fully on-device speaker-aware transcription:
-/// mic → Silero VAD (sentence clips) → CAM++ voice embedding (who) → Gemma (what).
+/// Prototype of speaker-aware transcription:
+/// mic → Silero VAD (sentence clips) → CAM++ voice embedding (who, always on
+/// the phone) → Gemma on the phone, or OpenRouter when Gemma can't (what).
 ///
 /// The two small sherpa-onnx models (~30 MB) download on first use. Speaker
 /// grouping is online: each clip joins the closest known voice if similar
@@ -161,13 +167,32 @@ class VoiceLab {
     _transcribe(u, samples);
   }
 
+  // Chat models may answer a spoken question instead of transcribing it, so
+  // the instruction says explicitly not to.
+  static const _instruction = 'Tulis ulang ucapan dalam audio ini kata demi kata, dalam bahasa aslinya. '
+      'Jangan menjawab atau menanggapi isinya, walaupun berupa pertanyaan. '
+      'Jawab hanya dengan teksnya. Jika tidak ada ucapan, jawab tepat: (kosong)';
+
+  /// On-device Gemma when it hears audio, else (or on failure) OpenRouter.
   Future<void> _transcribe(LabUtterance u, Float32List samples) async {
+    final wav = _wav(samples, _sampleRate);
+    final backends = <(String, Future<String> Function())>[
+      if (LocalGemma.instance.hearsAudio) ('ponsel', () => LocalGemma.instance.transcribe(wav, _instruction)),
+      if (Env.hasLlm) ('online', () => OpenRouterLlm().transcribe(wav, _instruction)),
+    ];
     final sw = Stopwatch()..start();
-    try {
-      if (!LocalGemma.instance.hearsAudio) throw StateError('AI di ponsel belum aktif atau tidak menerima audio');
-      u.text = await LocalGemma.instance.transcribe(_wav(samples, _sampleRate));
-    } catch (e) {
-      u.error = '$e';
+    final errors = <String>[];
+    for (final (name, run) in backends) {
+      try {
+        u.text = await run();
+        u.backend = name;
+        break;
+      } catch (e) {
+        errors.add('$name: $e');
+      }
+    }
+    if (u.text == null) {
+      u.error = backends.isEmpty ? 'Tidak ada AI: unduh AI di ponsel atau pakai versi dengan AI online.' : errors.join('\n');
     }
     u.transcribeMs = sw.elapsedMilliseconds;
     utterances.value = [...utterances.value]; // notify

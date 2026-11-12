@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/env.dart';
 import '../../../core/services/local_gemma.dart';
 import '../../../core/services/voice_lab.dart';
 import '../design/tokens.dart';
@@ -46,7 +47,10 @@ class _VoiceLabPageState extends State<VoiceLabPage> {
               LocalGemmaStatus.unsupported => 'AI di ponsel hanya ada di Android.',
               LocalGemmaStatus.absent => 'Model AI belum diunduh. Unduh atau impor dulu di Pengaturan.',
             };
-            return why == null ? const SizedBox.shrink() : _Banner('$why Pembicara tetap dideteksi, tapi tulisan tidak muncul.');
+            if (why == null) return const SizedBox.shrink();
+            return _Banner(Env.hasLlm
+                ? '$why Tulisan dibuat oleh AI online (audio dikirim ke internet).'
+                : '$why Pembicara tetap dideteksi, tapi tulisan tidak muncul.');
           },
         ),
         ValueListenableBuilder<double>(
@@ -120,7 +124,8 @@ class _UtteranceTile extends StatelessWidget {
     final meta = [
       '${u.seconds.toStringAsFixed(1)} dtk suara',
       'kemiripan ${u.similarity.toStringAsFixed(2)}',
-      if (u.transcribeMs != null) 'ditulis ${(u.transcribeMs! / 1000).toStringAsFixed(1)} dtk',
+      if (u.transcribeMs != null)
+        'ditulis ${(u.transcribeMs! / 1000).toStringAsFixed(1)} dtk${u.backend == null ? '' : ' (${u.backend})'}',
     ].join(' · ');
     return Padding(
       padding: const EdgeInsets.only(bottom: V5Space.md),

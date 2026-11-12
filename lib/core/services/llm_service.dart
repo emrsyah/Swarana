@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -29,12 +30,15 @@ abstract class LlmService {
   Future<String> titleFor(String text);
 }
 
-/// The real AI backend for live use: OpenRouter when a key was built in,
-/// falling back per call to on-device Gemma (offline, errors, timeouts).
-/// Null when neither is available, so callers use canned answers.
+/// The real AI backend for live use, decided per call: on-device Gemma when
+/// it is downloaded and loaded, otherwise (or if it fails) OpenRouter when a
+/// key was built in. Null when neither can ever answer, so callers use canned
+/// answers. Gemma is kept in the chain even if not ready yet: it may finish
+/// downloading mid-conversation, and until then it fails fast.
 PromptLlm? liveLlm() {
-  if (!Env.hasLlm) return LocalGemma.instance.isReady ? LocalGemmaLlm() : null;
-  return FallbackLlm([OpenRouterLlm(), LocalGemmaLlm()]);
+  final gemma = LocalGemma.instance.status.value != LocalGemmaStatus.unsupported;
+  if (!Env.hasLlm) return gemma && LocalGemma.instance.isReady ? LocalGemmaLlm() : null;
+  return FallbackLlm([if (gemma) LocalGemmaLlm(), OpenRouterLlm()]);
 }
 
 /// Tries each backend in order and returns the first answer. A backend that
@@ -167,7 +171,55 @@ class OpenRouterLlm extends PromptLlm {
   static final _url = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
 
   @override
-  Future<String> complete(String system, String input, {double temperature = 0.4}) async {
+  Future<String> complete(String system, String input, {double temperature = 0.4}) => _chat(
+        Env.openRouterModel,
+        [
+          {'role': 'system', 'content': system},
+          {'role': 'user', 'content': input},
+        ],
+        temperature: temperature,
+      );
+
+  /// Speech to text from a WAV clip with an audio-capable chat model
+  /// (faster than the dedicated transcription endpoint: ~1.8 s vs ~4.3 s).
+  Future<String> transcribe(Uint8List wav, String instruction) => _chat(
+        Env.openRouterAudioModel,
+        [
+          {
+            'role': 'user',
+            'content': [
+              {'type': 'text', 'text': instruction},
+              {
+                'type': 'input_audio',
+                'input_audio': {'data': base64Encode(wav), 'format': 'wav'},
+              },
+            ],
+          },
+        ],
+        temperature: 0,
+        timeout: const Duration(seconds: 30), // uploads up to ~600 KB
+      );
+
+  Future<String> _chat(
+    String model,
+    List<Map<String, Object>> messages, {
+    required double temperature,
+    Duration timeout = const Duration(seconds: 15),
+  }) async =>
+      parseContent(await _post(
+        {
+          'model': model,
+          'temperature': temperature,
+          ..._speedOptions(model),
+          'max_tokens': 300,
+          'messages': messages,
+        },
+        timeout: timeout,
+      ));
+
+  /// POSTs JSON, returns the response body; network/HTTP failures become
+  /// [LlmException] so [FallbackLlm] can move on.
+  Future<String> _post(Map<String, Object> json, {required Duration timeout}) async {
     final http.Response res;
     try {
       res = await _http
@@ -178,23 +230,14 @@ class OpenRouterLlm extends PromptLlm {
               'Content-Type': 'application/json',
               'X-Title': 'Swarana',
             },
-            body: jsonEncode({
-              'model': Env.openRouterModel,
-              'temperature': temperature,
-              ..._speedOptions(Env.openRouterModel),
-              'max_tokens': 300,
-              'messages': [
-                {'role': 'system', 'content': system},
-                {'role': 'user', 'content': input},
-              ],
-            }),
+            body: jsonEncode(json),
           )
-          .timeout(const Duration(seconds: 15));
+          .timeout(timeout);
     } on Exception catch (e) {
       throw LlmException('network: $e');
     }
     if (res.statusCode != 200) throw LlmException('HTTP ${res.statusCode}');
-    return parseContent(utf8.decode(res.bodyBytes));
+    return utf8.decode(res.bodyBytes);
   }
 
   /// Short, latency-sensitive tasks: no or minimal "thinking", fastest host.

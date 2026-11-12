@@ -130,17 +130,9 @@ class LocalGemma {
       _enqueue(Message.text(text: input, isUser: true), system: system, temperature: temperature);
 
   /// Speech to text from a WAV clip (16 kHz mono, under ~30 s).
-  Future<String> transcribe(Uint8List wav) {
-    if (!_audio) return Future.error(StateError('Model ini tidak bisa menerima audio'));
-    return _enqueue(
-      Message.withAudio(
-        text: 'Tulis ulang ucapan dalam audio ini kata demi kata, dalam bahasa aslinya. '
-            'Jawab hanya dengan teksnya. Jika tidak ada ucapan, jawab kosong.',
-        audioBytes: wav,
-        isUser: true,
-      ),
-      temperature: 0,
-    );
+  Future<String> transcribe(Uint8List wav, String instruction) {
+    if (!hearsAudio) return Future.error(StateError('Model ini tidak bisa menerima audio'));
+    return _enqueue(Message.withAudio(text: instruction, audioBytes: wav, isUser: true), temperature: 0);
   }
 
   Future<String> _enqueue(Message msg, {String? system, required double temperature}) {

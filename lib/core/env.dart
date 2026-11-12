@@ -9,5 +9,11 @@ class Env {
     defaultValue: 'qwen/qwen3.8-27b',
   );
 
+  /// Online speech-to-text model (OpenRouter /audio/transcriptions), used by
+  /// the speaker-detection lab when on-device Gemma can't take audio.
+  /// Measured: ~4.3 s and ~$0.0004 per 3 s sentence.
+  static const openRouterAudioModel =
+      String.fromEnvironment('OPENROUTER_AUDIO_MODEL', defaultValue: 'google/gemini-3.5-transcribe');
+
   static bool get hasLlm => openRouterKey.isNotEmpty;
 }
