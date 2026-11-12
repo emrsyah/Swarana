@@ -100,7 +100,7 @@ class _ComposerState extends State<Composer> {
     return Container(
       padding: const EdgeInsets.fromLTRB(V5Space.sm, V5Space.sm, V5Space.md, V5Space.sm),
       decoration: const BoxDecoration(
-        color: V5Colors.page,
+        color: V5Colors.surface,
         border: Border(top: BorderSide(color: V5Colors.border)),
       ),
       child: SafeArea(
@@ -111,34 +111,53 @@ class _ComposerState extends State<Composer> {
             tooltip: 'Papan kata dan kalimat',
             iconSize: 26,
             style: IconButton.styleFrom(minimumSize: const Size(minTouch, minTouch)),
-            icon: const Icon(Icons.grid_view_rounded, color: V5Colors.primary),
+            icon: const Icon(Icons.style_rounded, color: V5Colors.primary),
           ),
           Expanded(
-            child: TextField(onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(), 
+            child: TextField(onTapOutside: (_) => FocusManager.instance.primaryFocus?.unfocus(),
               controller: widget.controller,
               onChanged: _changed,
               minLines: 1,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
-              style: const TextStyle(fontSize: 17, height: 1.35),
-              decoration: const InputDecoration(hintText: Copy.tulisPesan),
+              style: const TextStyle(fontSize: 16, height: 1.35),
+              decoration: const InputDecoration(hintText: Copy.tulisPesan, fillColor: Color(0xFFF8F9FB)),
               onSubmitted: (_) => _send(),
             ),
           ),
           const SizedBox(width: V5Space.sm),
+          // Figma: round gradient send button with a soft blue glow.
           Semantics(
             button: true,
-            label: 'Kirim dan bunyikan',
-            child: Material(
-              color: canSend ? V5Colors.primary : V5Colors.primary.withValues(alpha: 0.4),
-              shape: const CircleBorder(),
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: canSend ? _send : null,
-                child: const SizedBox(
-                  width: 52,
-                  height: 52,
-                  child: Icon(Icons.send_rounded, color: Colors.white),
+            label: 'Kirim dan suarakan',
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 150),
+              opacity: canSend ? 1 : 0.55,
+              child: Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF7D9BFF), V5Colors.primary],
+                  ),
+                  boxShadow: [
+                    BoxShadow(color: V5Colors.primary.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 4)),
+                  ],
+                ),
+                child: Material(
+                  type: MaterialType.transparency,
+                  shape: const CircleBorder(),
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: canSend ? _send : null,
+                    child: Transform.rotate(
+                      angle: -0.6,
+                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 22),
+                    ),
+                  ),
                 ),
               ),
             ),

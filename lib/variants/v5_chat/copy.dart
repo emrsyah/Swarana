@@ -11,14 +11,15 @@ class Copy {
   static const paused = 'Jeda, tidak mendengar';
   static const idle = 'Tidak merekam';
   static const micUnavailable = 'Mikrofon tidak tersedia';
-  static const jeda = 'Jeda';
-  static const lanjutkan = 'Lanjutkan';
+  static const jeda = 'Berhenti dengar sebentar';
+  static const lanjutkan = 'Lanjutkan dengar';
   static const akhiriObrolan = 'Akhiri obrolan';
 
-  static const bunyikanLagi = 'Bunyikan lagi';
-  static const sedangDibunyikan = 'Sedang dibunyikan';
-  static const sudahDibunyikan = 'Sudah dibunyikan';
-  static const gagalDibunyikan = 'Gagal dibunyikan';
+  // Figma wording ("disuarakan").
+  static const bunyikanLagi = 'Suarakan lagi';
+  static const sedangDibunyikan = 'Sedang disuarakan';
+  static const sudahDibunyikan = 'Sudah disuarakan';
+  static const gagalDibunyikan = 'Gagal disuarakan';
   static const volumeNol = 'Volume 0, suara tidak keluar';
 
   static const sederhanakan = 'Sederhanakan';
@@ -29,7 +30,9 @@ class Copy {
   static const sederhana = 'Sederhana';
 
   static const tulisPesan = 'Tulis pesan di sini';
-  static const rekomendasi = 'Rekomendasi balasan';
+  static const rekomendasi = 'Rekomendasi Balasan';
+  static const mengenaliSuara = 'Mengenali suara pembicara baru…';
+  static String pembicaraTerdeteksi(int n) => '$n pembicara terdeteksi…';
   static const orangLainBicara = 'Orang lain bicara';
 
   static const simpan = 'Simpan';

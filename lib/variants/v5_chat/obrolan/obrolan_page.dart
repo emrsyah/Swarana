@@ -236,6 +236,11 @@ class _ObrolanPageState extends State<ObrolanPage> {
             level: c.level,
             onTogglePause: c.togglePause,
             onMenu: () => _scaffold.currentState!.openEndDrawer(),
+            subtitle: c.isGroup
+                ? Copy.pembicaraTerdeteksi(c.session.partnerCount)
+                : c.sttStatus == SttStatus.listening
+                    ? Copy.mengenaliSuara
+                    : null,
             actions: [
               if (manualSpeaker)
                 IconButton(
