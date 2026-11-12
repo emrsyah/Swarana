@@ -16,7 +16,7 @@ Both run on the same shared services (`lib/core/`), so the A/B compares the inte
 ```bash
 flutter pub get
 flutter run --dart-define=OPENROUTER_API_KEY=sk-or-...
-# optional: --dart-define=OPENROUTER_MODEL=google/gemini-3.8-flash
+# optional (default google/gemma-4-26b-a4b-it): --dart-define=OPENROUTER_MODEL=google/gemma-4-31b-it
 ```
 
 No key: AI features fall back to canned answers. Android 9+ (minSdk 28). The first Gradle build needs several GB free on the drive holding `~/.gradle`; set `GRADLE_USER_HOME` to another drive if C: is tight.
