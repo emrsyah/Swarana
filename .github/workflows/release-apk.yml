@@ -40,7 +40,15 @@ jobs:
             --dart-define=OPENROUTER_API_KEY="$OPENROUTER_API_KEY"
           cp build/app/outputs/flutter-apk/app-release.apk swarana.apk
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: swarana-apk
+          path: swarana.apk
+          retention-days: 7
+
+      # Manual runs on other branches only build (APK in the run's artifacts).
       - name: Publish to the "latest" release
+        if: github.event_name == 'push' || github.ref_name == 'main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

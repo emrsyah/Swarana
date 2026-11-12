@@ -9,7 +9,7 @@ Both run on the same shared services (`lib/core/`), so the A/B compares the inte
 
 ## Download
 
-**[⬇ Download swarana.apk](https://github.com/emrsyah/swarana/releases/latest/download/swarana.apk)** (Android 9+). Rebuilt automatically on every push; open the file on the phone and allow "install unknown apps". If an update refuses to install, uninstall the old one first.
+**[⬇ swarana.emirsyah.dev](https://swarana.emirsyah.dev)** (Android 9+). The domain is a Cloudflare Worker (`deploy/download/`, deploy with `npx wrangler deploy`) that streams the APK from the GitHub `latest` release. Rebuilt automatically on every push; open the file on the phone and allow "install unknown apps". If an update refuses to install, uninstall the old one first.
 
 ## Run
 

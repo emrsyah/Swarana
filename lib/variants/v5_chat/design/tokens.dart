@@ -10,15 +10,17 @@ class V5Colors {
 
   /// Secondary text. Darkened from the Figma grey (#9CA3AF-ish) to pass 4.5:1.
   static const muted = Color(0xFF5B6270);
-  static const border = Color(0xFFE5E7EB);
-  static const page = Color(0xFFFAFAFB);
+  static const border = Color(0xFFE3E6EC);
+  static const page = Color(0xFFF7F9FC);
   static const surface = Colors.white;
 
-  /// REVIEW: the user's own bubbles are tinted (WhatsApp convention); Figma
-  /// had grey own bubbles and white partner bubbles.
-  static const myBubble = Color(0xFFEAF0FF);
+  /// Figma: own bubbles grey once spoken, light blue with a blue outline
+  /// while being spoken; partner bubbles white with a thin border.
+  static const myBubble = Color(0xFFF1F2F5);
+  static const myBubbleSpeaking = Color(0xFFE6ECFF);
   static const partnerBubble = Colors.white;
   static const aiTint = Color(0xFFEAF0FF);
+  static const pillBorder = Color(0xFF8EA6FF);
 
   static const warningBg = Color(0xFFFFF8E6);
   static const warningBorder = Color(0xFFF5C451);
@@ -30,15 +32,15 @@ class V5Colors {
   static const recording = Color(0xFFEF4444);
 }
 
-/// REVIEW: per-speaker colours (Okabe-Ito, colourblind-safe). Figma used
-/// one blue for every speaker, so speakers could not be told apart.
+/// Per-speaker colours, Figma order: Pembicara 1 blue, Pembicara 2 green.
+/// All pass 4.5:1 on white for the coloured name label.
 const speakerPalette = [
-  Color(0xFF0072B2),
-  Color(0xFFD55E00),
-  Color(0xFF009E73),
-  Color(0xFFCC79A7),
-  Color(0xFF8A6D00), // darkened Okabe-Ito yellow for contrast on white
-  Color(0xFF3A8FC4),
+  Color(0xFF2F55E4),
+  Color(0xFF15803D),
+  Color(0xFFC2410C),
+  Color(0xFF7E3AF2),
+  Color(0xFFBE185D),
+  Color(0xFF0F766E),
 ];
 
 Color speakerColor(int index) => speakerPalette[index % speakerPalette.length];
@@ -53,7 +55,7 @@ class V5Space {
 }
 
 class V5Radius {
-  static const bubble = 16.0;
+  static const bubble = 14.0;
   static const card = 16.0;
   static const pill = 999.0;
 }

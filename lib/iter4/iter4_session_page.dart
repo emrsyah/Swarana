@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../core/env.dart';
 import '../core/services/llm_service.dart';
 import '../core/services/storage.dart';
 import 'iter4_controller.dart';
@@ -49,7 +48,7 @@ class _Iter4SessionPageState extends State<Iter4SessionPage> {
   late final c = Iter4Controller(
     participantId: widget.participantId,
     storage: widget.storage,
-    llm: Env.hasLlm ? OpenRouterLlm() : null,
+    llm: liveLlm(),
   );
   Timer? _tick;
 

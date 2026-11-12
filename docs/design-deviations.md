@@ -6,11 +6,11 @@ The app follows `design/v5/screens/*.png`. Where two expert reviews (Deaf access
 | --- | --- | --- | --- | --- |
 | Obrolan header | Red dot + "Mendengarkan…" in every state | Distinct states: listening (pulsing red + live level bars), paused (grey), idle "Tidak merekam", mic unavailable (red) | False "listening" signal is a trust/privacy failure | Deaf users cannot hear whether recording stopped |
 | Obrolan "Jeda" | Floating button over messages | Pill button in the header next to status | FAB covered bubble text | Content stays readable |
-| Obrolan bubbles | Own = grey, partner = white | Own = light blue tint, partner = white with speaker colour border | Reverses WhatsApp convention | Jakob's law, the report's own rationale |
-| Group speakers | Same blue avatar for all | Okabe-Ito colour per speaker, initial or number in avatar, coloured left border | Speakers indistinguishable, not colourblind-safe | Multi-speaker is a headline feature |
-| Speaker rename | Pencil icon after every name | Tap the name (48 px target) | Small, noisy target | |
-| TTS feedback | "Bunyikan Lagi" looks identical before/during/after | Per-bubble status: Sedang dibunyikan (wave), Sudah dibunyikan (check), Gagal / Volume 0 (red) + "Bunyikan lagi" | User cannot tell if the message was spoken | Visual-verbal parity principle |
-| Suggestions | One scrolling row, second chip clipped mid-word, red close X | Chips wrap to all options; neutral close; tap = send, long-press = edit | Hidden options, X signals error | |
+| Obrolan bubbles | Own = grey (blue outline while spoken), partner = white | Matches Figma (2026-11 alignment pass) | | |
+| Group speakers | Pembicara 1 blue, Pembicara 2 green, person avatar | Matches Figma; further speakers get orange, purple, pink, teal (all 4.5:1 on white) | | |
+| Speaker rename | Pencil icon after every name | Pencil kept as in Figma; name + pencil is one 48 px target | Small, noisy target | |
+| TTS feedback | "Sedang disuarakan" pill, "Sudah disuarakan" + "Suarakan lagi" | Matches Figma, plus red Gagal / Volume 0 state | User cannot tell if the message failed | Visual-verbal parity principle |
+| Suggestions | "Rekomendasi Balasan" with chevron; one scrolling row, chip clipped mid-word | Chevron folds the panel as in Figma; chips wrap to show all options; tap = send, long-press = edit | Hidden options | |
 | Composer | Text field + send only | Leading board button opens the Kata / Kalimat board | IA lists "template board visual" but no entry existed | Board is the AAC core |
 | Simplify / ask AI | Only in Riwayat detail / Transkrip | Long-press menu on every bubble (Bunyikan lagi, Sederhanakan, Tanya arti, Perbaiki, Minta ulangi, Salin); long partner bubbles show a visible Sederhanakan | Needed during live talk | |
 | STT errors | No correction | Low-confidence bubble shows "Mungkin kurang tepat, ketuk untuk perbaiki"; menu has Perbaiki tulisan and Minta ulangi | No way to fix mishearing | |

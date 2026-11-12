@@ -42,12 +42,8 @@ class MessageBubble extends StatelessWidget {
     final color = speakerColor(speaker.colorIndex);
     final body = TextStyle(fontSize: 17 * textScale, height: 1.45, color: V5Colors.ink);
 
-    final radius = BorderRadius.only(
-      topLeft: Radius.circular(me ? V5Radius.bubble : 4),
-      topRight: Radius.circular(me ? 4 : V5Radius.bubble),
-      bottomLeft: const Radius.circular(V5Radius.bubble),
-      bottomRight: const Radius.circular(V5Radius.bubble),
-    );
+    final radius = BorderRadius.circular(V5Radius.bubble);
+    final speaking = me && message.tts == TtsState.speaking;
     final content = Padding(
         padding: const EdgeInsets.fromLTRB(V5Space.lg, V5Space.md, V5Space.lg, V5Space.md),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -68,31 +64,33 @@ class MessageBubble extends StatelessWidget {
         ]),
     );
 
-    // Uniform border (Flutter cannot round mixed-colour borders); the speaker
-    // colour is a separate 4 px bar on the left of partner bubbles.
     final bubble = Semantics(
       onLongPressHint: 'Pilihan pesan',
       onLongPress: message.partial ? null : onMenu,
       child: GestureDetector(
         onLongPress: message.partial ? null : onMenu,
-        child: Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.78),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.66),
           decoration: BoxDecoration(
-            color: me ? V5Colors.myBubble : V5Colors.partnerBubble,
+            color: !me
+                ? V5Colors.partnerBubble
+                : speaking
+                    ? V5Colors.myBubbleSpeaking
+                    : V5Colors.myBubble,
             borderRadius: radius,
-            border: Border.all(color: me ? V5Colors.myBubble : V5Colors.border),
+            border: Border.all(
+              color: !me
+                  ? V5Colors.border
+                  : speaking
+                      ? V5Colors.primary
+                      : V5Colors.myBubble,
+            ),
+            boxShadow: me
+                ? null
+                : const [BoxShadow(color: Color(0x0A1F2A44), blurRadius: 8, offset: Offset(0, 2))],
           ),
-          child: me
-              ? content
-              : ClipRRect(
-                  borderRadius: radius,
-                  child: IntrinsicHeight(
-                    child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
-                      Container(width: 4, color: color),
-                      Flexible(child: content),
-                    ]),
-                  ),
-                ),
+          child: content,
         ),
       ),
     );
@@ -119,11 +117,11 @@ class MessageBubble extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(minHeight: minTouch),
-                  // Name in ink for contrast; colour stays on avatar and bar.
+                  // Figma: name and pencil in the speaker's colour.
                   child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text(speaker.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: V5Colors.ink)),
-                    const SizedBox(width: 4),
-                    const Icon(Icons.edit_outlined, size: 16, color: V5Colors.muted),
+                    Text(speaker.name, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: color)),
+                    const SizedBox(width: 6),
+                    Icon(Icons.edit_square, size: 16, color: color),
                   ]),
                 ),
               ),
@@ -142,20 +140,26 @@ class _Avatar extends StatelessWidget {
   final String name;
   final Color color;
 
+  /// Figma: person glyph on a soft gradient of the speaker colour, white ring.
   @override
-  Widget build(BuildContext context) {
-    // Initial from the name, or the number for "Pembicara 2".
-    final n = name.trim().isEmpty ? '?' : name.trim();
-    final parts = n.split(' ');
-    final initial = RegExp(r'^\d+$').hasMatch(parts.last) ? parts.last : n.characters.first.toUpperCase();
-    return ExcludeSemantics(
-      child: CircleAvatar(
-        radius: 18,
-        backgroundColor: color,
-        child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => ExcludeSemantics(
+        child: Container(
+          width: 32,
+          height: 32,
+          margin: const EdgeInsets.only(top: 4),
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 2),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color.lerp(color, Colors.white, 0.35)!, color],
+            ),
+            boxShadow: [BoxShadow(color: color.withValues(alpha: 0.25), blurRadius: 6, offset: const Offset(0, 2))],
+          ),
+          child: const Icon(Icons.person_rounded, size: 18, color: Colors.white),
+        ),
+      );
 }
 
 class _Simplified extends StatelessWidget {
@@ -214,11 +218,22 @@ class _TtsStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Widget status = switch (state) {
-      TtsState.speaking => const Row(mainAxisSize: MainAxisSize.min, children: [
-          _Wave(),
-          SizedBox(width: 6),
-          Text(Copy.sedangDibunyikan, style: TextStyle(fontSize: 13, color: V5Colors.primary, fontWeight: FontWeight.w500)),
-        ]),
+      // Figma: outlined pill "🔊 Sedang disuarakan ••••".
+      TtsState.speaking => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.6),
+            borderRadius: BorderRadius.circular(V5Radius.pill),
+            border: Border.all(color: V5Colors.pillBorder),
+          ),
+          child: const Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.volume_up_rounded, size: 16, color: V5Colors.primary),
+            SizedBox(width: 6),
+            Text(Copy.sedangDibunyikan, style: TextStyle(fontSize: 13, color: V5Colors.primary, fontWeight: FontWeight.w500)),
+            SizedBox(width: 6),
+            _Wave(),
+          ]),
+        ),
       TtsState.done => const Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.check_circle, size: 16, color: V5Colors.success),
           SizedBox(width: 4),
@@ -232,24 +247,30 @@ class _TtsStatus extends StatelessWidget {
         ]),
       TtsState.idle => const SizedBox.shrink(),
     };
+    // Figma stacks status above the "Suarakan lagi" pill.
     return Padding(
       padding: const EdgeInsets.only(top: V5Space.sm),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        spacing: V5Space.sm,
-        runSpacing: V5Space.xs,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Semantics(liveRegion: true, child: status),
           if (state != TtsState.speaking && onSpeak != null)
-            OutlinedButton.icon(
-              onPressed: onSpeak,
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(0, 36),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                tapTargetSize: MaterialTapTargetSize.padded,
+            Padding(
+              padding: EdgeInsets.only(top: state == TtsState.idle ? 0 : V5Space.xs),
+              child: OutlinedButton.icon(
+                onPressed: onSpeak,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 34),
+                  backgroundColor: V5Colors.aiTint,
+                  side: const BorderSide(color: V5Colors.pillBorder),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500),
+                  tapTargetSize: MaterialTapTargetSize.padded,
+                ),
+                icon: const Icon(Icons.volume_up_rounded, size: 16),
+                label: const Text(Copy.bunyikanLagi),
               ),
-              icon: const Icon(Icons.volume_up, size: 18),
-              label: const Text(Copy.bunyikanLagi),
             ),
         ],
       ),
@@ -286,13 +307,18 @@ class _WaveState extends State<_Wave> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
         animation: _c,
-        builder: (_, _) => Row(children: [
-          for (var i = 0; i < 4; i++)
+        // Figma: a row of small dots that ripple while speaking.
+        builder: (_, _) => Row(mainAxisSize: MainAxisSize.min, children: [
+          for (var i = 0; i < 9; i++)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 1),
-              width: 3,
-              height: 5 + 9 * (0.5 + 0.5 * math.sin((_c.value + i * 0.2) * 2 * math.pi)),
-              decoration: BoxDecoration(color: V5Colors.primary, borderRadius: BorderRadius.circular(2)),
+              width: 3.5,
+              height: 3.5,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: V5Colors.primary.withValues(
+                    alpha: 0.35 + 0.65 * (0.5 + 0.5 * math.sin((_c.value - i * 0.1) * 2 * math.pi))),
+              ),
             ),
         ]),
       );

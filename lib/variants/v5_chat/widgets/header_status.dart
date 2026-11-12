@@ -21,7 +21,11 @@ class HeaderStatus extends StatelessWidget {
     this.onTogglePause,
     this.actions = const [],
     this.onMenu,
+    this.subtitle,
   });
+
+  /// Grey line under the header ("2 pembicara terdeteksi…").
+  final String? subtitle;
 
   final String title;
   final SttStatus status;
@@ -37,7 +41,24 @@ class HeaderStatus extends StatelessWidget {
       color: V5Colors.surface,
       child: SafeArea(
         bottom: false,
-        child: Container(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          _header(t),
+          if (subtitle != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(V5Space.xl, V5Space.md, V5Space.lg, V5Space.md),
+              decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: V5Colors.border))),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(subtitle!, style: const TextStyle(fontSize: 13, color: V5Colors.muted)),
+              ),
+            ),
+        ]),
+      ),
+    );
+  }
+
+  Widget _header(TextTheme t) => Container(
           padding: const EdgeInsets.fromLTRB(V5Space.xl, V5Space.md, V5Space.lg, V5Space.md),
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: V5Colors.border))),
           // Title + actions on top; status + Jeda on their own full-width row
@@ -58,10 +79,7 @@ class HeaderStatus extends StatelessWidget {
                 _PauseButton(listening: status == SttStatus.listening, onTap: onTogglePause!),
             ]),
           ]),
-        ),
-      ),
-    );
-  }
+        );
 }
 
 class _StatusRow extends StatelessWidget {
@@ -84,15 +102,16 @@ class _StatusRow extends StatelessWidget {
       child: Row(children: [
         icon,
         const SizedBox(width: V5Space.sm),
-        if (status == SttStatus.listening) ...[
-          _LevelBars(level: level),
-          const SizedBox(width: V5Space.sm),
-        ],
-        Flexible(
-          child: Text(label,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: color)),
-        ),
+        // Figma: while listening only the dot meter shows (label stays for
+        // screen readers); other states keep a visible label.
+        if (status == SttStatus.listening)
+          Flexible(child: _LevelBars(level: level))
+        else
+          Flexible(
+            child: Text(label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: color)),
+          ),
       ]),
     );
   }
@@ -142,24 +161,33 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
   }
 }
 
-/// Five bars driven by the real input level.
+/// Figma's dotted line, driven by the real input level: dots light up from the
+/// left as the sound gets louder.
 class _LevelBars extends StatelessWidget {
   const _LevelBars({required this.level});
   final ValueListenable<double> level;
 
+  static const _n = 15;
+
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<double>(
         valueListenable: level,
-        builder: (_, v, _) => Row(children: [
-          for (var i = 0; i < 5; i++)
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
-              margin: const EdgeInsets.symmetric(horizontal: 1.5),
-              width: 3,
-              height: 4 + 14 * (v * (1 - (i - 2).abs() * 0.25)).clamp(0.0, 1.0),
-              decoration: BoxDecoration(color: V5Colors.primary, borderRadius: BorderRadius.circular(2)),
-            ),
-        ]),
+        builder: (_, v, _) {
+          final lit = (0.25 + 0.75 * v.clamp(0.0, 1.0)) * _n;
+          return Row(mainAxisSize: MainAxisSize.min, children: [
+            for (var i = 0; i < _n; i++)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                margin: const EdgeInsets.symmetric(horizontal: 1.2),
+                width: 4,
+                height: 4,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: V5Colors.primary.withValues(alpha: i < lit ? 1 : 0.25),
+                ),
+              ),
+          ]);
+        },
       );
 }
 
@@ -174,10 +202,13 @@ class _PauseButton extends StatelessWidget {
         style: TextButton.styleFrom(
           foregroundColor: V5Colors.primary,
           backgroundColor: V5Colors.aiTint,
-          shape: const StadiumBorder(),
+          shape: const StadiumBorder(side: BorderSide(color: V5Colors.pillBorder)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
+          minimumSize: const Size(0, 40),
+          tapTargetSize: MaterialTapTargetSize.padded,
+          textStyle: const TextStyle(fontFamily: 'Inter', fontSize: 13, fontWeight: FontWeight.w500),
         ),
-        icon: Icon(listening ? Icons.pause : Icons.mic, size: 20),
+        icon: Icon(listening ? Icons.pause_rounded : Icons.mic_rounded, size: 18),
         label: Text(listening ? Copy.jeda : Copy.lanjutkan),
       );
 }
