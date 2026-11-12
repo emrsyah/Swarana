@@ -7,6 +7,7 @@ import '../design/tokens.dart';
 import '../drawer.dart';
 import '../v5_routes.dart';
 import '../widgets/text_size_slider.dart';
+import 'voice_lab_page.dart';
 
 /// Pengaturan (no Figma yet; IA: "Identifikasi Pembicara Otomatis On/Off").
 class SettingsPage extends StatelessWidget {
@@ -70,6 +71,12 @@ class SettingsPage extends StatelessWidget {
         ),
         _Header('AI'),
         const _LocalModelTile(),
+        ListTile(
+          leading: const Icon(Icons.record_voice_over_outlined),
+          title: const Text('Uji deteksi pembicara (eksperimen)'),
+          subtitle: const Text('Kenali siapa yang bicara dan tulis ucapannya, semua di ponsel.'),
+          onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const VoiceLabPage())),
+        ),
         _Header('Privasi'),
         const ListTile(
           leading: Icon(Icons.lock_outline),

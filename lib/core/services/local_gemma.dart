@@ -27,9 +27,13 @@ class LocalGemma {
   String? lastError;
 
   InferenceModel? _model;
+  bool _audio = false;
   Future<void> _queue = Future.value();
 
   bool get isReady => status.value == LocalGemmaStatus.ready;
+
+  /// Whether the loaded model accepts audio ([transcribe]).
+  bool get hearsAudio => isReady && _audio;
 
   /// Call once at startup (not awaited): registers the engine and, if the
   /// model was downloaded earlier, loads it.
@@ -71,13 +75,30 @@ class LocalGemma {
 
   /// One prompt, one fresh session. Calls are serialised: the phone has one
   /// model in memory and suggestions/titles can fire at the same time.
-  Future<String> complete(String system, String input, {double temperature = 0.4}) {
-    final run = _queue.then((_) => _complete(system, input, temperature));
+  Future<String> complete(String system, String input, {double temperature = 0.4}) =>
+      _enqueue(Message.text(text: input, isUser: true), system: system, temperature: temperature);
+
+  /// Speech to text from a WAV clip (16 kHz mono, under ~30 s).
+  Future<String> transcribe(Uint8List wav) {
+    if (!_audio) return Future.error(StateError('Model ini tidak bisa menerima audio'));
+    return _enqueue(
+      Message.withAudio(
+        text: 'Tulis ulang ucapan dalam audio ini kata demi kata, dalam bahasa aslinya. '
+            'Jawab hanya dengan teksnya. Jika tidak ada ucapan, jawab kosong.',
+        audioBytes: wav,
+        isUser: true,
+      ),
+      temperature: 0,
+    );
+  }
+
+  Future<String> _enqueue(Message msg, {String? system, required double temperature}) {
+    final run = _queue.then((_) => _run(msg, system, temperature));
     _queue = run.then((_) {}, onError: (_) {});
     return run;
   }
 
-  Future<String> _complete(String system, String input, double temperature) async {
+  Future<String> _run(Message msg, String? system, double temperature) async {
     final model = _model;
     if (model == null) throw StateError('Model lokal belum siap');
     final session = await model.createSession(
@@ -88,7 +109,7 @@ class LocalGemma {
       maxOutputTokens: 200,
     );
     try {
-      await session.addQueryChunk(Message.text(text: input, isUser: true));
+      await session.addQueryChunk(msg);
       return (await session.getResponse()).trim();
     } finally {
       await session.close();
@@ -104,11 +125,22 @@ class LocalGemma {
     status.value = LocalGemmaStatus.loading;
     // Re-running install on an installed file only marks it active.
     if (!installed) await _builder().install();
-    try {
-      _model = await FlutterGemma.getActiveModel(maxTokens: 2048, preferredBackend: PreferredBackend.gpu);
-    } catch (_) {
-      // No usable GPU delegate on this phone.
-      _model = await FlutterGemma.getActiveModel(maxTokens: 2048, preferredBackend: PreferredBackend.cpu);
+    // Best first: GPU with the audio encoder. CPU covers phones without a
+    // usable GPU delegate; the last try drops audio so text AI still works.
+    const attempts = [
+      (PreferredBackend.gpu, true),
+      (PreferredBackend.cpu, true),
+      (PreferredBackend.cpu, false),
+    ];
+    for (final (i, (backend, audio)) in attempts.indexed) {
+      try {
+        _model = await FlutterGemma.getActiveModel(maxTokens: 2048, preferredBackend: backend, supportAudio: audio);
+        _audio = audio;
+        break;
+      } catch (e) {
+        if (i == attempts.length - 1) rethrow;
+        debugPrint('LocalGemma: $backend audio=$audio failed: $e');
+      }
     }
     lastError = null;
     status.value = LocalGemmaStatus.ready;
